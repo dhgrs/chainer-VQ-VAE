@@ -87,12 +87,13 @@ trainer.extend(extensions.snapshot_object(model, 'model{.updater.iteration}'),
                trigger=opt.report_interval)
 trainer.extend(extensions.LogReport(trigger=(5, 'iteration')))
 trainer.extend(extensions.PrintReport(
-    ['epoch', 'iteration', 'main/loss1', 'main/loss2', 'main/loss3',
-     'validation/loss1', 'validation/loss2', 'validation/loss3']),
+    ['epoch', 'iteration',
+     'main/loss1', 'main/loss2', 'main/loss3', 'validation/main/loss1',
+     'validation/main/loss2', 'validation/main/loss3']),
     trigger=(5, 'iteration'))
 trainer.extend(extensions.PlotReport(
-    ['main/loss1', 'main/loss2', 'main/loss3',
-     'validation/loss1', 'validation/loss2', 'validation/loss3'],
+    ['main/loss1', 'main/loss2', 'main/loss3', 'validation/main/loss1',
+     'validation/main/loss2', 'validation/main/loss3'],
     'iteration', file_name='loss.png', trigger=(5, 'iteration')))
 trainer.extend(extensions.ProgressBar(update_interval=5))
 
