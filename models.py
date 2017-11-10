@@ -146,9 +146,7 @@ class VAE(chainer.Chain):
         y = self.dec(e, sigmoid=False)
 
         # calculate loss
-        loss1 = 0
-        for i in range(self.n_sample):
-            loss1 += F.mean(F.bernoulli_nll(x, y, reduce='no')) / self.n_sample
+        loss1 = F.mean(F.bernoulli_nll(x, y, reduce='no')) / self.n_sample
         loss2 = F.mean((z.data - e_) ** 2)
         loss3 = self.beta * F.mean((z - e.data) ** 2)
         loss = loss1 + loss2 + loss3
