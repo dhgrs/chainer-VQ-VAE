@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 import shutil
+import glob
 
 try:
     import matplotlib
@@ -11,6 +12,7 @@ except ImportError:
 import chainer
 from chainer.training import extensions
 
+from utils import Preprocess
 from models import VAE
 import opt
 
@@ -31,7 +33,11 @@ args = parser.parse_args()
 
 
 # setup dataset iterator
-train, valid = chainer.datasets.get_mnist(False, 3)
+preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.length)
+files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
+data = chainer.datasets.TransformDataset(files, preprocess)
+
+train, valid = chainer.datasets.split_dataset(data, 40000)
 
 # make directory of results
 result = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -103,6 +109,8 @@ if args.resume:
 # run
 print('GPU1: {}'.format(args.gpu))
 print('GPU2: {}'.format(args.GPU))
+print('train: {}'.format(len(train)))
+print('valid: {}'.format(len(valid)))
 print('# Minibatch-size: {}'.format(opt.batchsize))
 print('# {}: {}'.format(opt.trigger[1], opt.trigger[0]))
 print('')
