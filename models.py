@@ -141,7 +141,8 @@ class ResidualBlock(chainer.Chain):
                                                ksize=(2, 1), pad=(dilation, 0),
                                                dilate=(dilation, 1))
             self.cond = L.DilatedConvolution2D(None, n_channel1 * 2,
-                                               ksize=(2, 1), pad=(dilation, 0))
+                                               ksize=(2, 1), pad=(dilation, 0),
+                                               dilate=(dilation, 1))
             self.proj = L.Convolution2D(n_channel1, n_channel2, 1)
 
         self.dilation = dilation
@@ -149,9 +150,11 @@ class ResidualBlock(chainer.Chain):
 
     def __call__(self, x, h=None):
         length = x.shape[2]
+
         # Dilated Conv
         x = self.conv(x)
         x = x[:, :, :length, :]
+
         if h is not None:
             h = self.cond(h)
             h = h[:, :, :length, :]
@@ -189,7 +192,6 @@ class ResidualNet(chainer.ChainList):
         super(ResidualNet, self).__init__()
         dilations = [
             n_filter ** i for j in range(n_loop) for i in range(n_layer)]
-        print(dilations)
         for i, dilation in enumerate(dilations):
             self.add_link(ResidualBlock(dilation, n_channel1, n_channel2))
 
