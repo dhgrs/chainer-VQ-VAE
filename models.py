@@ -1,11 +1,6 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-import six
-
-from chainer import cuda
-from chainer import function_node
-from chainer.utils import type_check
 
 
 class StraightThrough(chainer.function_node.FunctionNode):
@@ -106,7 +101,7 @@ class VQ(chainer.link.Link):
 
 
 class Encoder(chainer.Chain):
-    def __init__(self, d=256):
+    def __init__(self, d):
         super(Encoder, self).__init__()
         with self.init_scope():
             self.conv1 = L.Convolution2D(1, d, (4, 1), (2, 1), (1, 0))
@@ -134,19 +129,21 @@ def gated(x, h=None):
 
 
 class ResidualBlock(chainer.Chain):
-    def __init__(self, dilation, n_channel1=32, n_channel2=16):
+    def __init__(self, dilation, n_channel1, n_channel2, conditional):
         super(ResidualBlock, self).__init__()
         with self.init_scope():
-            self.conv = L.DilatedConvolution2D(n_channel2, n_channel1 * 2,
-                                               ksize=(2, 1), pad=(dilation, 0),
-                                               dilate=(dilation, 1))
-            self.cond = L.DilatedConvolution2D(None, n_channel1 * 2,
-                                               ksize=(2, 1), pad=(dilation, 0),
-                                               dilate=(dilation, 1))
-            self.proj = L.Convolution2D(n_channel1, n_channel2, 1)
+            self.conv = L.DilatedConvolution2D(
+                n_channel2, n_channel1 * 2, ksize=(2, 1), pad=(dilation, 0),
+                dilate=(dilation, 1))
+            if conditional:
+                self.cond = L.DilatedConvolution2D(
+                    None, n_channel1 * 2, ksize=(2, 1), pad=(dilation, 0),
+                    dilate=(dilation, 1))
+            self.proj = L.Convolution2D(n_channel1, n_channel2 * 2, 1)
 
         self.dilation = dilation
         self.n_channel2 = n_channel2
+        self.conditional = conditional
 
     def __call__(self, x, h=None):
         length = x.shape[2]
@@ -164,75 +161,81 @@ class ResidualBlock(chainer.Chain):
 
         # Projection
         z = self.proj(z)
-        return z
+        return z[:, :self.n_channel2], z[:, self.n_channel2:]
 
-    def initialize(self, n, cond=False):
+    def initialize(self, n):
         self.queue = chainer.Variable(
             self.xp.zeros((n, self.n_channel2, self.dilation + 1, 1),
                           dtype=self.xp.float32))
         self.conv.pad = (0, 0)
-        if cond:
+        if self.conditional:
             self.cond_queue = chainer.Variable(
-                self.xp.zeros((n, self.n_channel2, self.dilation + 1, 1),
+                self.xp.zeros((n, 256, self.dilation + 1, 1),
                               dtype=self.xp.float32))
             self.cond.pad = (0, 0)
         else:
-            self.cond = None
+            self.cond_queue = None
 
     def pop(self):
         return self.__call__(self.queue, self.cond_queue)
 
-    def push(self, sample):
+    def push(self, sample, h=None):
         self.queue = F.concat((self.queue[:, :, 1:, :], sample), axis=2)
+        if h is not None:
+            self.cond_queue = F.concat(
+                (self.cond_queue[:, :, 1:, :], h), axis=2)
 
 
 class ResidualNet(chainer.ChainList):
     def __init__(self, n_loop, n_layer, n_filter,
-                 n_channel1=32, n_channel2=16):
+                 n_channel1, n_channel2, conditional):
         super(ResidualNet, self).__init__()
         dilations = [
             n_filter ** i for j in range(n_loop) for i in range(n_layer)]
         for i, dilation in enumerate(dilations):
-            self.add_link(ResidualBlock(dilation, n_channel1, n_channel2))
+            self.add_link(
+                ResidualBlock(dilation, n_channel1, n_channel2, conditional))
+        self.conditional = conditional
 
     def __call__(self, x, h=None):
         for i, func in enumerate(self.children()):
             a = x
-            x = func(x, h)
+            x, skip = func(x, h)
             if i == 0:
-                skip_connections = x
+                skip_connections = skip
             else:
-                skip_connections += x
+                skip_connections += skip
             x = x + a
         return skip_connections
 
-    def initialize(self, n, cond=False):
+    def initialize(self, n):
         for block in self.children():
-            block.initialize(n, cond)
+            block.initialize(n)
 
     def generate(self, x, h=None):
         sample = x
         for i, func in enumerate(self.children()):
             a = sample
             func.push(sample, h)
-            sample = func.pop()
+            sample, skip = func.pop()
             if i == 0:
-                skip_connections = sample
+                skip_connections = skip
             else:
-                skip_connections += sample
+                skip_connections += skip
             sample = sample + a
         return skip_connections
 
 
 class WaveNet(chainer.Chain):
-    def __init__(self, n_loop, n_layer, n_filter, quantize=256,
-                 n_channel1=32, n_channel2=16, n_channel3=512):
+    def __init__(self, n_loop, n_layer, n_filter, quantize,
+                 n_channel1, n_channel2, n_channel3,
+                 conditional):
         super(WaveNet, self).__init__()
         with self.init_scope():
             self.caus = L.Convolution2D(
                 quantize, n_channel2, (2, 1), pad=(1, 0))
             self.resb = ResidualNet(
-                n_loop, n_layer, n_filter, n_channel1, n_channel2)
+                n_loop, n_layer, n_filter, n_channel1, n_channel2, conditional)
             self.proj1 = L.Convolution2D(n_channel2, n_channel3, 1)
             self.proj2 = L.Convolution2D(n_channel3, quantize, 1)
         self.n_layer = n_layer
@@ -254,8 +257,8 @@ class WaveNet(chainer.Chain):
         y = self.proj2(z)
         return y
 
-    def initialize(self, n, cond=None):
-        self.resb.initialize(n, cond)
+    def initialize(self, n):
+        self.resb.initialize(n)
         self.caus.pad = (0, 0)
         self.queue1 = chainer.Variable(
             self.xp.zeros((n, self.quantize, 2, 1), dtype=self.xp.float32))
@@ -277,27 +280,57 @@ class WaveNet(chainer.Chain):
 
 
 class VAE(chainer.Chain):
-    def __init__(self, k=512, beta=0.25):
+    def __init__(self, d=256, k=512, n_loop=3, n_layer=10, n_filter=2,
+                 quantize=256, n_channel1=32, n_channel2=16, n_channel3=512,
+                 beta=0.25, conditional=True):
         super(VAE, self).__init__()
         self.beta = beta
+        self.quantize = quantize
         with self.init_scope():
-            self.enc = Encoder()
+            self.enc = Encoder(d)
             self.vq = VQ(k)
-            self.dec = WaveNet(3, 10, 2)
+            self.dec = WaveNet(
+                n_loop, n_layer, n_filter, quantize,
+                n_channel1, n_channel2, n_channel3,
+                conditional)
 
     def __call__(self, x, qt, t):
         # forward
         z = self.enc(x)
         e = self.vq(z)
-        e_ = self.vq(z.data)
-        y = self.dec(qt, F.unpooling_2d(e, (64, 1), cover_all=False))
+        e_ = self.vq(chainer.Variable(z.data))
+        scale = qt.shape[2] // e.shape[2]
+        y = self.dec(qt, F.unpooling_2d(e, (scale, 1), cover_all=False))
 
         # calculate loss
         loss1 = F.softmax_cross_entropy(y, t)
-        loss2 = F.mean((z.data - e_) ** 2)
-        loss3 = self.beta * F.mean((z - e.data) ** 2)
+        loss2 = F.mean((chainer.Variable(z.data) - e_) ** 2)
+        loss3 = self.beta * F.mean((z - chainer.Variable(e.data)) ** 2)
         loss = loss1 + loss2 + loss3
         chainer.reporter.report(
             {'loss1': loss1, 'loss2': loss2, 'loss3': loss3, 'loss': loss},
             self)
         return loss
+
+    def generate(self, x):
+        # initialize and encode
+        output = self.xp.zeros(x.shape[2])
+        self.dec.initialize(1)
+        with chainer.using_config('enable_backprop', False):
+                z = self.enc(x)
+                e = F.unpooling_2d(self.vq(z), (64, 1), cover_all=False)
+        x = chainer.Variable(self.xp.zeros(
+            self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
+        length = e.shape[2]
+
+        # generate
+        for i in range(length-1):
+            with chainer.using_config('enable_backprop', False):
+                out = self.dec.generate(x, e[:, :, i:i+1])
+            zeros = self.xp.zeros_like(x.data)
+            value = self.xp.random.choice(
+                self.quantize, p=F.softmax(out).data[0, :, 0, 0])
+            output[i] = value
+            zeros[:, value, :, :] = 1
+            x = chainer.Variable(zeros)
+        return output
