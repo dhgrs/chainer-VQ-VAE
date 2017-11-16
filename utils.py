@@ -52,14 +52,22 @@ class Preprocess(object):
             qt = self.mu_law.transform(raw)
             np.save(qt_npy, qt)
 
-        # triming
-        if self.random:
-            start = random.randint(0, len(raw) - self.length-1)
-            raw = raw[start:start + self.length]
-            qt = qt[start:start + self.length]
+        if len(raw) <= self.length:
+            # padding
+            pad = self.length-len(raw)
+            raw = np.concatenate(
+                (raw, np.zeros(pad, dtype=np.float32)))
+            qt = np.concatenate(
+                (qt, self.mu // 2 * np.ones(pad, dtype=np.int32)))
         else:
-            raw = raw[start:start + self.length]
-            qt = qt[start:start + self.length]
+            # triming
+            if self.random:
+                start = random.randint(0, len(raw) - self.length-1)
+                raw = raw[start:start + self.length]
+                qt = qt[start:start + self.length]
+            else:
+                raw = raw[start:start + self.length]
+                qt = qt[start:start + self.length]
 
         # expand dimension
         raw = raw.reshape((1, -1, 1))
