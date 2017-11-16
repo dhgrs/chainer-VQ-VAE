@@ -19,10 +19,8 @@ import opt
 
 # use CPU or GPU
 parser = argparse.ArgumentParser()
-parser.add_argument('--gpu', '-g', type=int, default=-1,
-                    help='GPU ID (negative value indicates CPU)')
-parser.add_argument('--GPU', '-G', type=int, default=-1,
-                    help='GPU ID (negative value indicates CPU)')
+parser.add_argument('--gpus', '-g', type=int, default=[-1], nargs='+',
+                    help='GPU IDs (negative value indicates CPU)')
 parser.add_argument('--process', '-p', type=int, default=1,
                     help='Number of parallel processes')
 parser.add_argument('--prefetch', '-f', type=int, default=1,
@@ -42,18 +40,18 @@ train, valid = chainer.datasets.split_dataset(data, 40000)
 # make directory of results
 result = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 os.mkdir(result)
-shutil.copy(__file__, result + '/' + __file__)
-shutil.copy('models.py', result + '/' + 'models.py')
-shutil.copy('opt.py', result + '/' + 'opt.py')
+shutil.copy(__file__, os.path.join(result, __file__))
+shutil.copy('utils.py', os.path.join(result, 'utils.py'))
+shutil.copy('models.py', os.path.join(result, 'models.py'))
+shutil.copy('opt.py', os.path.join(result, 'opt.py'))
+shutil.copy('generate.py', os.path.join(result, 'generate.py'))
 
 # Model
-gpu = max(args.gpu, args.GPU)
-if args.gpu >= 0 and args.GPU >= 0:
-    chainer.cuda.get_device_from_id(gpu).use()
-model = VAE()
+model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
+            opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
 
 # Optimizer
-optimizer = chainer.optimizers.Adam(opt.lr)
+optimizer = chainer.optimizers.Adam(opt.lr//len(args.gpus))
 optimizer.setup(model)
 
 # Iterator
@@ -62,55 +60,56 @@ if args.process * args.prefetch > 1:
         train, opt.batchsize,
         n_processes=args.process, n_prefetch=args.prefetch)
     valid_iter = chainer.iterators.MultiprocessIterator(
-        valid, opt.batchsize, repeat=False, shuffle=False,
+        valid, opt.batchsize//len(args.gpus), repeat=False, shuffle=False,
         n_processes=args.process, n_prefetch=args.prefetch)
 else:
     train_iter = chainer.iterators.SerialIterator(train, opt.batchsize)
-    valid_iter = chainer.iterators.SerialIterator(valid, opt.batchsize,
-                                                  repeat=False, shuffle=False)
+    valid_iter = chainer.iterators.SerialIterator(
+        valid, opt.batchsize//len(args.gpus), repeat=False, shuffle=False)
 
 # Updater
-if args.gpu >= 0 and args.GPU >= 0:
-    chainer.cuda.get_device_from_id(args.gpu).use()
-    updater = chainer.training.ParallelUpdater(
-        train_iter, optimizer,
-        devices={'main': gpu, 'second': min(args.gpu, args.GPU)})
-elif args.gpu >= 0 or args.GPU >= 0:
-    chainer.cuda.get_device_from_id(args.gpu).use()
-    updater = chainer.training.StandardUpdater(
-        train_iter, optimizer, device=gpu)
-else:
+if args.gpus == [-1]:
     updater = chainer.training.StandardUpdater(train_iter, optimizer)
+else:
+    chainer.cuda.get_device_from_id(args.gpus[0]).use()
+    names = ['main'] + list(range(len(args.gpus)-1))
+    devices = {str(name): gpu for name, gpu in zip(names, args.gpus)}
+    updater = chainer.training.ParallelUpdater(
+        train_iter, optimizer, devices=devices)
 
 # Trainer
 trainer = chainer.training.Trainer(updater, opt.trigger, out=result)
 
 # Extensions
-trainer.extend(extensions.Evaluator(valid_iter, model, device=gpu),
+trainer.extend(extensions.Evaluator(valid_iter, model, device=args.gpus[0]),
                trigger=opt.report_interval)
 trainer.extend(extensions.dump_graph('main/loss'))
 trainer.extend(extensions.snapshot_object(model, 'model{.updater.iteration}'),
                trigger=opt.report_interval)
-trainer.extend(extensions.LogReport(trigger=(5, 'iteration')))
+trainer.extend(extensions.LogReport(trigger=(100, 'iteration')))
 trainer.extend(extensions.PrintReport(
     ['epoch', 'iteration',
      'main/loss1', 'main/loss2', 'main/loss3', 'validation/main/loss1',
      'validation/main/loss2', 'validation/main/loss3']),
-    trigger=(5, 'iteration'))
+    trigger=(100, 'iteration'))
 trainer.extend(extensions.PlotReport(
-    ['main/loss1', 'main/loss2', 'main/loss3', 'validation/main/loss1',
-     'validation/main/loss2', 'validation/main/loss3'],
-    'iteration', file_name='loss.png', trigger=(5, 'iteration')))
-trainer.extend(extensions.ProgressBar(update_interval=5))
+    ['main/loss1', 'validation/main/loss1'],
+    'iteration', file_name='loss1.png', trigger=(100, 'iteration')))
+trainer.extend(extensions.PlotReport(
+    ['main/loss2', 'validation/main/loss2'],
+    'iteration', file_name='loss2.png', trigger=(100, 'iteration')))
+trainer.extend(extensions.PlotReport(
+    ['main/loss3', 'validation/main/loss3'],
+    'iteration', file_name='loss3.png', trigger=(100, 'iteration')))
+trainer.extend(extensions.ProgressBar(update_interval=100))
 
 if args.resume:
     chainer.serializers.load_npz(args.resume, trainer)
 
 # run
-print('GPU1: {}'.format(args.gpu))
-print('GPU2: {}'.format(args.GPU))
-print('train: {}'.format(len(train)))
-print('valid: {}'.format(len(valid)))
+print('GPUs: {}'.format(args.gpus))
+print('# train: {}'.format(len(train)))
+print('# valid: {}'.format(len(valid)))
 print('# Minibatch-size: {}'.format(opt.batchsize))
 print('# {}: {}'.format(opt.trigger[1], opt.trigger[0]))
 print('')
