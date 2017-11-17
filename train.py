@@ -51,7 +51,7 @@ model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
             opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
 
 # Optimizer
-optimizer = chainer.optimizers.Adam(opt.lr//len(args.gpus))
+optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
 optimizer.setup(model)
 
 # Iterator
@@ -107,7 +107,7 @@ if args.resume:
     chainer.serializers.load_npz(args.resume, trainer)
 
 # run
-print('GPUs: {}'.format(args.gpus))
+print('GPUs: {}'.format(*args.gpus))
 print('# train: {}'.format(len(train)))
 print('# valid: {}'.format(len(valid)))
 print('# Minibatch-size: {}'.format(opt.batchsize))
