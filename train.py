@@ -14,6 +14,8 @@ from chainer.training import extensions
 
 from utils import Preprocess
 from models import VAE
+from updaters import VQVAE_StandardUpdater
+from updaters import VQVAE_ParallelUpdater
 import opt
 
 
@@ -43,6 +45,7 @@ os.mkdir(result)
 shutil.copy(__file__, os.path.join(result, __file__))
 shutil.copy('utils.py', os.path.join(result, 'utils.py'))
 shutil.copy('models.py', os.path.join(result, 'models.py'))
+shutil.copy('models.py', os.path.join(result, 'updaters.py'))
 shutil.copy('opt.py', os.path.join(result, 'opt.py'))
 shutil.copy('generate.py', os.path.join(result, 'generate.py'))
 
@@ -69,12 +72,12 @@ else:
 
 # Updater
 if args.gpus == [-1]:
-    updater = chainer.training.StandardUpdater(train_iter, optimizer)
+    updater = VQVAE_StandardUpdater(train_iter, optimizer)
 else:
     chainer.cuda.get_device_from_id(args.gpus[0]).use()
     names = ['main'] + list(range(len(args.gpus)-1))
     devices = {str(name): gpu for name, gpu in zip(names, args.gpus)}
-    updater = chainer.training.ParallelUpdater(
+    updater = VQVAE_ParallelUpdater(
         train_iter, optimizer, devices=devices)
 
 # Trainer

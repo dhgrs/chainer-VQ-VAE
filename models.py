@@ -310,7 +310,7 @@ class VAE(chainer.Chain):
         chainer.reporter.report(
             {'loss1': loss1, 'loss2': loss2, 'loss3': loss3, 'loss': loss},
             self)
-        return loss
+        return loss1, loss2, loss3
 
     def generate(self, x):
         # initialize and encode
