@@ -30,5 +30,6 @@ python generate.py <trained model> <input audio>
 ```
 
 # TODO
-- [ ] upload generated sample(now training and it's progressing well)
+- [x] upload generated sample
+  - I use a model trained 5000 iterations. It takes about 3.5h for training with 1x 1080Ti.
 - [ ] speaker conditional model
