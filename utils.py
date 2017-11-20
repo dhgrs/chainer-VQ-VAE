@@ -37,13 +37,15 @@ class Preprocess(object):
     def __call__(self, path):
         # load data
         raw_npy = path.replace('.{}'.format(self.data_format),
-                               '_{}.npy'.format(self.sr))
+                               '_{}_norm.npy'.format(self.sr))
         qt_npy = path.replace('.{}'.format(self.data_format),
-                              '_{}_{}.npy'.format(self.sr, self.mu))
+                              '_{}_{}_norm.npy'.format(self.sr, self.mu))
         if os.path.exists(raw_npy):
             raw = np.load(raw_npy)
+            raw /= np.abs(raw).max()
         else:
             raw = self.read_file(path)
+            raw /= np.abs(raw).max()
             np.save(raw_npy, raw)
 
         if os.path.exists(qt_npy):
@@ -66,8 +68,8 @@ class Preprocess(object):
                 raw = raw[start:start + self.length]
                 qt = qt[start:start + self.length]
             else:
-                raw = raw[start:start + self.length]
-                qt = qt[start:start + self.length]
+                raw = raw[:self.length]
+                qt = qt[:self.length]
 
         # expand dimension
         raw = raw.reshape((1, -1, 1))
