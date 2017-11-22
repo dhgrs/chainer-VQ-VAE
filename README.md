@@ -33,3 +33,4 @@ python generate.py <trained model> <input audio>
 - [x] upload generated sample
   - I use a model trained 40000 iterations. It takes about 26.5h for training with 1x 1080Ti.
 - [ ] speaker conditional model
+  - There are the codes in [develop](https://github.com/dhgrs/chainer-VQ-VAE/tree/develop). Now I've finished the implementation and I'm training now.
