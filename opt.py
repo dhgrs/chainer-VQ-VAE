@@ -1,8 +1,10 @@
 # parameters of training
-batchsize = 1 
+batchsize = 1
 lr = 2e-4
-trigger = (100000, 'iteration')
-report_interval = (5000, 'iteration')
+trigger = (200000, 'iteration')
+evaluate_interval = (1, 'epoch')
+snapshot_interval = (1000, 'iteration')
+report_interval = (100, 'iteration')
 
 # parameters of dataset
 root = 'VCTK-Corpus'

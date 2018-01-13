@@ -85,25 +85,25 @@ trainer = chainer.training.Trainer(updater, opt.trigger, out=result)
 
 # Extensions
 trainer.extend(extensions.Evaluator(valid_iter, model, device=args.gpus[0]),
-               trigger=opt.report_interval)
+               trigger=opt.evaluate_interval)
 trainer.extend(extensions.dump_graph('main/loss'))
 trainer.extend(extensions.snapshot_object(model, 'model{.updater.iteration}'),
-               trigger=opt.report_interval)
-trainer.extend(extensions.LogReport(trigger=(100, 'iteration')))
+               trigger=opt.snapshot_interval)
+trainer.extend(extensions.LogReport(trigger=opt.report_interval))
 trainer.extend(extensions.PrintReport(
     ['epoch', 'iteration',
      'main/loss1', 'main/loss2', 'main/loss3', 'validation/main/loss1',
      'validation/main/loss2', 'validation/main/loss3']),
-    trigger=(100, 'iteration'))
+    trigger=opt.report_interval)
 trainer.extend(extensions.PlotReport(
     ['main/loss1', 'validation/main/loss1'],
-    'iteration', file_name='loss1.png', trigger=(100, 'iteration')))
+    'iteration', file_name='loss1.png', trigger=opt.report_interval))
 trainer.extend(extensions.PlotReport(
     ['main/loss2', 'validation/main/loss2'],
-    'iteration', file_name='loss2.png', trigger=(100, 'iteration')))
+    'iteration', file_name='loss2.png', trigger=opt.report_interval))
 trainer.extend(extensions.PlotReport(
     ['main/loss3', 'validation/main/loss3'],
-    'iteration', file_name='loss3.png', trigger=(100, 'iteration')))
+    'iteration', file_name='loss3.png', trigger=opt.report_interval))
 trainer.extend(extensions.ProgressBar(update_interval=100))
 
 if args.resume:
