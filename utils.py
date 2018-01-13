@@ -36,23 +36,11 @@ class Preprocess(object):
 
     def __call__(self, path):
         # load data
-        raw_npy = path.replace('.{}'.format(self.data_format),
-                               '_{}_norm.npy'.format(self.sr))
-        qt_npy = path.replace('.{}'.format(self.data_format),
-                              '_{}_{}_norm.npy'.format(self.sr, self.mu))
-        if os.path.exists(raw_npy):
-            raw = np.load(raw_npy)
-            raw /= np.abs(raw).max()
-        else:
-            raw = self.read_file(path)
-            raw /= np.abs(raw).max()
-            np.save(raw_npy, raw)
+        raw = self.read_file(path)
+        raw /= np.abs(raw).max()
+        raw, _ = librosa.effects.trim(raw)
 
-        if os.path.exists(qt_npy):
-            qt = np.load(qt_npy)
-        else:
-            qt = self.mu_law.transform(raw)
-            np.save(qt_npy, qt)
+        qt = self.mu_law.transform(raw)
 
         if len(raw) <= self.length:
             # padding
