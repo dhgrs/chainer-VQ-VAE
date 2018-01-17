@@ -129,7 +129,7 @@ def gated(x, h=None):
 
 
 class ResidualBlock(chainer.Chain):
-    def __init__(self, dilation, n_channel1, n_channel2, conditional):
+    def __init__(self, dilation, n_channel1, n_channel2, conditional, d):
         super(ResidualBlock, self).__init__()
         with self.init_scope():
             self.conv = L.DilatedConvolution2D(
@@ -137,12 +137,13 @@ class ResidualBlock(chainer.Chain):
                 dilate=(dilation, 1))
             if conditional:
                 self.cond = L.DilatedConvolution2D(
-                    None, n_channel1 * 2, ksize=(2, 1), pad=(dilation, 0),
+                    d, n_channel1 * 2, ksize=(2, 1), pad=(dilation, 0),
                     dilate=(dilation, 1))
             self.proj = L.Convolution2D(n_channel1, n_channel2 * 2, 1)
 
         self.dilation = dilation
         self.n_channel2 = n_channel2
+        self.d = d
         self.conditional = conditional
 
     def __call__(self, x, h=None):
@@ -170,7 +171,7 @@ class ResidualBlock(chainer.Chain):
         self.conv.pad = (0, 0)
         if self.conditional:
             self.cond_queue = chainer.Variable(
-                self.xp.zeros((n, 256, self.dilation + 1, 1),
+                self.xp.zeros((n, self.d, self.dilation + 1, 1),
                               dtype=self.xp.float32))
             self.cond.pad = (0, 0)
         else:
@@ -188,13 +189,13 @@ class ResidualBlock(chainer.Chain):
 
 class ResidualNet(chainer.ChainList):
     def __init__(self, n_loop, n_layer, n_filter,
-                 n_channel1, n_channel2, conditional):
+                 n_channel1, n_channel2, conditional, d):
         super(ResidualNet, self).__init__()
         dilations = [
             n_filter ** i for j in range(n_loop) for i in range(n_layer)]
         for i, dilation in enumerate(dilations):
-            self.add_link(
-                ResidualBlock(dilation, n_channel1, n_channel2, conditional))
+            self.add_link(ResidualBlock(dilation, n_channel1, n_channel2,
+                                        conditional, d))
         self.conditional = conditional
 
     def __call__(self, x, h=None):
@@ -229,13 +230,13 @@ class ResidualNet(chainer.ChainList):
 class WaveNet(chainer.Chain):
     def __init__(self, n_loop, n_layer, n_filter, quantize,
                  n_channel1, n_channel2, n_channel3,
-                 conditional):
+                 conditional, d):
         super(WaveNet, self).__init__()
         with self.init_scope():
             self.caus = L.Convolution2D(
                 quantize, n_channel2, (2, 1), pad=(1, 0))
-            self.resb = ResidualNet(
-                n_loop, n_layer, n_filter, n_channel1, n_channel2, conditional)
+            self.resb = ResidualNet(n_loop, n_layer, n_filter, n_channel1,
+                                    n_channel2, conditional, d)
             self.proj1 = L.Convolution2D(n_channel2, n_channel3, 1)
             self.proj2 = L.Convolution2D(n_channel3, quantize, 1)
         self.n_layer = n_layer
@@ -292,7 +293,7 @@ class VAE(chainer.Chain):
             self.dec = WaveNet(
                 n_loop, n_layer, n_filter, quantize,
                 n_channel1, n_channel2, n_channel3,
-                conditional)
+                conditional, d)
 
     def __call__(self, x, qt, t):
         # forward
@@ -317,8 +318,8 @@ class VAE(chainer.Chain):
         output = self.xp.zeros(x.shape[2])
         self.dec.initialize(1)
         with chainer.using_config('enable_backprop', False):
-                z = self.enc(x)
-                e = F.unpooling_2d(self.vq(z), (64, 1), cover_all=False)
+            z = self.enc(x)
+            e = F.unpooling_2d(self.vq(z), (64, 1), cover_all=False)
         x = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
         length = e.shape[2]
