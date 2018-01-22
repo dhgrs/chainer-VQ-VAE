@@ -34,10 +34,16 @@ args = parser.parse_args()
 
 # setup dataset iterator
 preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.length)
-files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
-data = chainer.datasets.TransformDataset(files, preprocess)
-
-train, valid = chainer.datasets.split_dataset(data, 40000)
+if opt.dataset == 'VCTK':
+    files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
+    valid_files = glob.glob(os.path.join(opt.root, 'wav48/p3[5-7]*/*.wav'))
+elif opt.dataset == 'ARCTIC':
+    files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
+    valid_files = glob.glob(
+        os.path.join(opt.root, 'cmu_us_ksp_arctic/wav/*.wav'))
+train_files = list(set(files) - set(valid_files))
+train = chainer.datasets.TransformDataset(train_files, preprocess)
+valid = chainer.datasets.TransformDataset(valid_files, preprocess)
 
 # make directory of results
 result = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')

@@ -7,7 +7,10 @@ snapshot_interval = (1000, 'iteration')
 report_interval = (100, 'iteration')
 
 # parameters of dataset
-root = 'VCTK-Corpus'
+# root = 'VCTK-Corpus'
+# dataset = 'VCTK'
+root = 'CMU_ARCTIC'
+dataset = 'ARCTIC'
 data_format = 'wav'
 sr = 16000
 mu = 256
