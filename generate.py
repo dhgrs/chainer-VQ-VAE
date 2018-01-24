@@ -15,7 +15,8 @@ chainer.serializers.load_npz(sys.argv[1], model)
 
 n = 1
 x = np.expand_dims(Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.sr * 3, False)(sys.argv[2])[0], 0)
+    opt.data_format, opt.sr, opt.mu, opt.top_db,
+    opt.sr * 3, False)(sys.argv[2])[0], 0)
 output = model.generate(x)
 wave = mu_law(opt.mu).itransform(output)
 np.save('result.npy', wave)
