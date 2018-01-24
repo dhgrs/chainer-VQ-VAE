@@ -33,7 +33,8 @@ args = parser.parse_args()
 
 
 # setup dataset iterator
-preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.length)
+preprocess = Preprocess(
+    opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length)
 if opt.dataset == 'VCTK':
     files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
     valid_files = glob.glob(os.path.join(opt.root, 'wav48/p3[5-7]*/*.wav'))

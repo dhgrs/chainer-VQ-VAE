@@ -26,19 +26,20 @@ class mu_law(object):
 
 
 class Preprocess(object):
-    def __init__(self, data_format, sr, mu, length, random=True):
+    def __init__(self, data_format, sr, mu, top_db, length, random=True):
         self.data_format = data_format
         self.sr = sr
         self.mu = mu
         self.mu_law = mu_law(mu)
+        self.top_db = top_db
         self.length = length + 1
         self.random = random
 
     def __call__(self, path):
         # load data
         raw = self.read_file(path)
+        raw, _ = librosa.effects.trim(raw, self.top_db)
         raw /= np.abs(raw).max()
-        raw, _ = librosa.effects.trim(raw)
 
         qt = self.mu_law.transform(raw)
 

@@ -14,6 +14,7 @@ dataset = 'ARCTIC'
 data_format = 'wav'
 sr = 16000
 mu = 256
+top_db = 20
 length = 16000
 
 # parameters of VQ
