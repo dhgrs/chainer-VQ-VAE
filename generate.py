@@ -11,7 +11,7 @@ import opt
 
 model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
             opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
-chainer.serializers.load_npz(sys.argv[1], model)
+chainer.serializers.load_npz(sys.argv[1], model, 'updater/model:main/')
 
 n = 1
 x = np.expand_dims(Preprocess(

@@ -94,8 +94,7 @@ trainer = chainer.training.Trainer(updater, opt.trigger, out=result)
 trainer.extend(extensions.Evaluator(valid_iter, model, device=args.gpus[0]),
                trigger=opt.evaluate_interval)
 trainer.extend(extensions.dump_graph('main/loss'))
-trainer.extend(extensions.snapshot_object(model, 'model{.updater.iteration}'),
-               trigger=opt.snapshot_interval)
+trainer.extend(extensions.snapshot(), trigger=opt.snapshot_interval)
 trainer.extend(extensions.LogReport(trigger=opt.report_interval))
 trainer.extend(extensions.PrintReport(
     ['epoch', 'iteration',
