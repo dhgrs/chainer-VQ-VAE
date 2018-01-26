@@ -12,10 +12,10 @@ class VQVAE_StandardUpdater(chainer.training.StandardUpdater):
 
         loss1, loss2, loss3 = loss_func(*in_arrays)
         optimizer.target.cleargrads()
-        loss1.backwards()
+        loss1.backward()
         optimizer.target.vq.cleargrads()
-        loss2.backwards()
-        loss3.backwards()
+        loss2.backward()
+        loss3.backward()
         optimizer.update()
 
 
