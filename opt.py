@@ -19,7 +19,7 @@ length = 16000
 
 # parameters of VQ
 d = 512
-k = 512
+k = 128
 
 # parameters of Decoder(WaveNet)
 n_loop = 3
