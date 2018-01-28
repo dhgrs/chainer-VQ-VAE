@@ -25,7 +25,7 @@ class mu_law(object):
         return x.astype(self.float_type)
 
 
-class Preprocess(object):
+class PreprocessMuLaw(object):
     def __init__(self, data_format, sr, mu, top_db, length, random=True):
         self.data_format = data_format
         self.sr = sr
@@ -37,7 +37,7 @@ class Preprocess(object):
 
     def __call__(self, path):
         # load data
-        raw = self.read_file(path)
+        raw = read_file(path, self.sr)
         raw, _ = librosa.effects.trim(raw, self.top_db)
         raw /= np.abs(raw).max()
 
@@ -65,8 +65,40 @@ class Preprocess(object):
         y = np.identity(self.mu)[qt].astype(np.float32)
         y = np.expand_dims(y.T, 2)
         t = np.expand_dims(qt.astype(np.int32), 1)
-        return raw[:, :-1, :], y[:, :-1, :], t[1:, :]
+        return raw[:, :-1, :], t[1:, :], y[:, :-1, :]
 
-    def read_file(self, path):
-        x, sr = librosa.core.load(path, self.sr, res_type='kaiser_fast')
-        return x
+
+class PreprocessMixture(object):
+    def __init__(self, data_format, sr, top_db, length, random=True):
+        self.data_format = data_format
+        self.sr = sr
+        self.top_db = top_db
+        self.length = length + 1
+        self.random = random
+
+    def __call__(self, path):
+        # load data
+        raw = read_file(path, self.sr)
+        raw, _ = librosa.effects.trim(raw, self.top_db)
+        raw /= np.abs(raw).max()
+        if len(raw) <= self.length:
+            # padding
+            pad = self.length-len(raw)
+            raw = np.concatenate(
+                (raw, np.zeros(pad, dtype=np.float32)))
+        else:
+            # triming
+            if self.random:
+                start = random.randint(0, len(raw) - self.length-1)
+                raw = raw[start:start + self.length]
+            else:
+                raw = raw[:self.length]
+
+        # expand dimensio
+        raw = raw.reshape((1, -1, 1))
+        return raw[:, :-1, :], raw[:, 1:, :]
+
+
+def read_file(path, sr):
+    x, sr = librosa.core.load(path, sr, res_type='kaiser_fast')
+    return x

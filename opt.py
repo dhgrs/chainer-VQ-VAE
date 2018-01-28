@@ -4,12 +4,12 @@ lr = 2e-4
 trigger = (200000, 'iteration')
 evaluate_interval = (1, 'epoch')
 snapshot_interval = (1000, 'iteration')
-report_interval = (100, 'iteration')
+report_interval = (1, 'iteration')
 
 # parameters of dataset
 # root = 'VCTK-Corpus'
 # dataset = 'VCTK'
-root = 'CMU_ARCTIC'
+root = '../CMU_ARCTIC'
 dataset = 'ARCTIC'
 data_format = 'wav'
 sr = 16000
@@ -22,12 +22,14 @@ d = 512
 k = 512
 
 # parameters of Decoder(WaveNet)
-n_loop = 3
-n_layer = 10
+n_loop = 2
+n_layer = 2
 n_filter = 2
 n_channel1 = 256
 n_channel2 = 512
 n_channel3 = 256
+# quantize = 'mulaw'
+quantize = 'mixture'
 
 # parameters of losses
 beta = 0.25

@@ -12,7 +12,7 @@ except ImportError:
 import chainer
 from chainer.training import extensions
 
-from utils import Preprocess
+from utils import PreprocessMuLaw, PreprocessMixture
 from models import VAE
 from updaters import VQVAE_StandardUpdater
 from updaters import VQVAE_ParallelUpdater
@@ -33,8 +33,12 @@ args = parser.parse_args()
 
 
 # setup dataset iterator
-preprocess = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length)
+if opt.quantize == 'mulaw':
+    preprocess = PreprocessMuLaw(
+        opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length)
+elif opt.quantize == 'mixture':
+    preprocess = PreprocessMixture(
+        opt.data_format, opt.sr, opt.top_db, opt.length)
 if opt.dataset == 'VCTK':
     files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
     valid_files = glob.glob(os.path.join(opt.root, 'wav48/p3[5-7]*/*.wav'))
@@ -57,8 +61,9 @@ shutil.copy('opt.py', os.path.join(result, 'opt.py'))
 shutil.copy('generate.py', os.path.join(result, 'generate.py'))
 
 # Model
-model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
+model = VAE(
+    opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.quantize, opt.mu,
+    opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
 
 # Optimizer
 optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
@@ -110,7 +115,7 @@ trainer.extend(extensions.PlotReport(
 trainer.extend(extensions.PlotReport(
     ['main/loss3', 'validation/main/loss3'],
     'iteration', file_name='loss3.png', trigger=opt.report_interval))
-trainer.extend(extensions.ProgressBar(update_interval=100))
+trainer.extend(extensions.ProgressBar(update_interval=1))
 
 if args.resume:
     chainer.serializers.load_npz(args.resume, trainer)
