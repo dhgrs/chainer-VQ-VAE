@@ -26,13 +26,15 @@ class mu_law(object):
 
 
 class Preprocess(object):
-    def __init__(self, data_format, sr, mu, top_db, length, random=True):
+    def __init__(self, data_format, sr, mu, top_db, length, speaker_dic,
+                 random=True):
         self.data_format = data_format
         self.sr = sr
         self.mu = mu
         self.mu_law = mu_law(mu)
         self.top_db = top_db
         self.length = length + 1
+        self.speaker_dic = speaker_dic
         self.random = random
 
     def __call__(self, path):
@@ -65,7 +67,11 @@ class Preprocess(object):
         y = np.identity(self.mu)[qt].astype(np.float32)
         y = np.expand_dims(y.T, 2)
         t = np.expand_dims(qt.astype(np.int32), 1)
-        return raw[:, :-1, :], y[:, :-1, :], t[1:, :]
+
+        # get speaker-id
+        speaker = self.speaker_dic[os.path.basename(os.path.dirname(path))]
+
+        return raw[:, :-1, :], y[:, :-1, :], np.int32(speaker), t[1:, :]
 
     def read_file(self, path):
         x, sr = librosa.core.load(path, self.sr, res_type='kaiser_fast')

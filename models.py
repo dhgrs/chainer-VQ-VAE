@@ -283,7 +283,7 @@ class WaveNet(chainer.Chain):
 class VAE(chainer.Chain):
     def __init__(self, d=256, k=512, n_loop=3, n_layer=10, n_filter=2,
                  quantize=256, n_channel1=32, n_channel2=16, n_channel3=512,
-                 beta=0.25, conditional=True):
+                 beta=0.25, n_speaker=None):
         super(VAE, self).__init__()
         self.beta = beta
         self.quantize = quantize
@@ -293,15 +293,19 @@ class VAE(chainer.Chain):
             self.dec = WaveNet(
                 n_loop, n_layer, n_filter, quantize,
                 n_channel1, n_channel2, n_channel3,
-                conditional, d)
+                True, d)
+            self.embed = L.EmbedID(n_speaker, d)
 
-    def __call__(self, x, qt, t):
+    def __call__(self, x, qt, speaker, t):
         # forward
         z = self.enc(x)
         e = self.vq(z)
         e_ = self.vq(chainer.Variable(z.data))
         scale = qt.shape[2] // e.shape[2]
-        y = self.dec(qt, F.unpooling_2d(e, (scale, 1), cover_all=False))
+        cond = self.embed(speaker).reshape((x.shape[0], -1, 1, 1))
+        cond = F.unpooling_2d(cond, (qt.shape[2], 1), cover_all=False)
+        cond += F.unpooling_2d(e, (scale, 1), cover_all=False)
+        y = self.dec(qt, cond)
 
         # calculate loss
         loss1 = F.softmax_cross_entropy(y, t)
@@ -313,13 +317,14 @@ class VAE(chainer.Chain):
             self)
         return loss1, loss2, loss3
 
-    def generate(self, x):
+    def generate(self, x, speaker):
         # initialize and encode
         output = self.xp.zeros(x.shape[2])
         self.dec.initialize(1)
         with chainer.using_config('enable_backprop', False):
             z = self.enc(x)
             e = F.unpooling_2d(self.vq(z), (64, 1), cover_all=False)
+            speaker = self.embed(speaker).reshape((1, -1, 1, 1))
         x = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
         length = e.shape[2]
@@ -327,7 +332,7 @@ class VAE(chainer.Chain):
         # generate
         for i in range(length-1):
             with chainer.using_config('enable_backprop', False):
-                out = self.dec.generate(x, e[:, :, i:i+1])
+                out = self.dec.generate(x, e[:, :, i:i+1] + speaker)
             zeros = self.xp.zeros_like(x.data)
             value = self.xp.random.choice(
                 self.quantize, p=F.softmax(out).data[0, :, 0, 0])

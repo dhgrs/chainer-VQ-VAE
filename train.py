@@ -33,18 +33,23 @@ args = parser.parse_args()
 
 
 # setup dataset iterator
-preprocess = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length)
+
 if opt.dataset == 'VCTK':
+    speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
+    n_speaker = len(speakers)
+    speaker_dic = {
+        os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
     files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
-    valid_files = glob.glob(os.path.join(opt.root, 'wav48/p3[5-7]*/*.wav'))
-elif opt.dataset == 'ARCTIC':
-    files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
-    valid_files = glob.glob(
-        os.path.join(opt.root, 'cmu_us_ksp_arctic/wav/*.wav'))
-train_files = list(set(files) - set(valid_files))
-train = chainer.datasets.TransformDataset(train_files, preprocess)
-valid = chainer.datasets.TransformDataset(valid_files, preprocess)
+# elif opt.dataset == 'ARCTIC':
+#     files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
+#     valid_files = glob.glob(
+#         os.path.join(opt.root, 'cmu_us_ksp_arctic/wav/*.wav'))
+
+preprocess = Preprocess(
+    opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length, speaker_dic)
+
+dataset = chainer.datasets.TransformDataset(files, preprocess)
+train, valid = chainer.datasets.split_dataset(dataset, int(len(dataset) * 0.9))
 
 # make directory of results
 result = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -52,13 +57,14 @@ os.mkdir(result)
 shutil.copy(__file__, os.path.join(result, __file__))
 shutil.copy('utils.py', os.path.join(result, 'utils.py'))
 shutil.copy('models.py', os.path.join(result, 'models.py'))
-shutil.copy('models.py', os.path.join(result, 'updaters.py'))
+shutil.copy('updaters.py', os.path.join(result, 'updaters.py'))
 shutil.copy('opt.py', os.path.join(result, 'opt.py'))
 shutil.copy('generate.py', os.path.join(result, 'generate.py'))
 
 # Model
 model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.n_channel1, opt.n_channel2, opt.n_channel3, opt.beta, True)
+            opt.n_channel1, opt.n_channel2, opt.n_channel3,
+            opt.beta, n_speaker)
 
 # Optimizer
 optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
