@@ -50,7 +50,8 @@ preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.top_db,
                         opt.length, opt.dataset, speaker_dic)
 
 dataset = chainer.datasets.TransformDataset(files, preprocess)
-train, valid = chainer.datasets.split_dataset(dataset, int(len(dataset) * 0.9))
+train, valid = chainer.datasets.split_dataset_random(
+    dataset, int(len(dataset) * 0.9))
 
 # make directory of results
 result = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
