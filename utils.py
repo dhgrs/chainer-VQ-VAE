@@ -26,14 +26,15 @@ class mu_law(object):
 
 
 class Preprocess(object):
-    def __init__(self, data_format, sr, mu, top_db, length, speaker_dic,
-                 random=True):
+    def __init__(self, data_format, sr, mu, top_db, length, dataset,
+                 speaker_dic, random=True):
         self.data_format = data_format
         self.sr = sr
         self.mu = mu
         self.mu_law = mu_law(mu)
         self.top_db = top_db
         self.length = length + 1
+        self.dataset = dataset
         self.speaker_dic = speaker_dic
         self.random = random
 
@@ -43,35 +44,39 @@ class Preprocess(object):
         raw, _ = librosa.effects.trim(raw, self.top_db)
         raw /= np.abs(raw).max()
 
-        qt = self.mu_law.transform(raw)
+        quantized = self.mu_law.transform(raw)
 
         if len(raw) <= self.length:
             # padding
             pad = self.length-len(raw)
             raw = np.concatenate(
                 (raw, np.zeros(pad, dtype=np.float32)))
-            qt = np.concatenate(
-                (qt, self.mu // 2 * np.ones(pad, dtype=np.int32)))
+            quantized = np.concatenate(
+                (quantized, self.mu // 2 * np.ones(pad, dtype=np.int32)))
         else:
             # triming
             if self.random:
                 start = random.randint(0, len(raw) - self.length-1)
                 raw = raw[start:start + self.length]
-                qt = qt[start:start + self.length]
+                quantized = quantized[start:start + self.length]
             else:
                 raw = raw[:self.length]
-                qt = qt[:self.length]
+                quantized = quantized[:self.length]
 
         # expand dimension
         raw = raw.reshape((1, -1, 1))
-        y = np.identity(self.mu)[qt].astype(np.float32)
-        y = np.expand_dims(y.T, 2)
-        t = np.expand_dims(qt.astype(np.int32), 1)
+        one_hot = np.identity(self.mu)[quantized].astype(np.float32)
+        one_hot = np.expand_dims(one_hot.T, 2)
+        quantized = np.expand_dims(quantized.astype(np.int32), 1)
 
         # get speaker-id
-        speaker = self.speaker_dic[os.path.basename(os.path.dirname(path))]
-
-        return raw[:, :-1, :], y[:, :-1, :], np.int32(speaker), t[1:, :]
+        if self.dataset == 'VCTK':
+            speaker = self.speaker_dic[os.path.basename(os.path.dirname(path))]
+        elif self.dataset == 'ARCTIC':
+            speaker = self.speaker_dic[
+                os.path.basename(os.path.dirname(os.path.dirname(path)))]
+        speaker = np.int32(speaker)
+        return raw[:, :-1, :], one_hot[:, :-1, :], speaker, quantized[1:, :]
 
     def read_file(self, path):
         x, sr = librosa.core.load(path, self.sr, res_type='kaiser_fast')

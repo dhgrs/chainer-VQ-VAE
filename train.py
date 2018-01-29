@@ -31,22 +31,23 @@ parser.add_argument('--resume', '-r', default='',
                     help='Resume the training from snapshot')
 args = parser.parse_args()
 
-
-# setup dataset iterator
-
+# get speaker dictionary
 if opt.dataset == 'VCTK':
     speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
-    n_speaker = len(speakers)
-    speaker_dic = {
-        os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
-    files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
-# elif opt.dataset == 'ARCTIC':
-#     files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
-#     valid_files = glob.glob(
-#         os.path.join(opt.root, 'cmu_us_ksp_arctic/wav/*.wav'))
+elif opt.dataset == 'ARCTIC':
+    speakers = glob.glob(os.path.join(opt.root, '*'))
+n_speaker = len(speakers)
+speaker_dic = {
+    os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
 
-preprocess = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db, opt.length, speaker_dic)
+# get paths
+if opt.dataset == 'VCTK':
+    files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
+elif opt.dataset == 'ARCTIC':
+    files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
+
+preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.top_db,
+                        opt.length, opt.dataset, speaker_dic)
 
 dataset = chainer.datasets.TransformDataset(files, preprocess)
 train, valid = chainer.datasets.split_dataset(dataset, int(len(dataset) * 0.9))
@@ -57,13 +58,16 @@ os.mkdir(result)
 shutil.copy(__file__, os.path.join(result, __file__))
 shutil.copy('utils.py', os.path.join(result, 'utils.py'))
 shutil.copy('models.py', os.path.join(result, 'models.py'))
+shutil.copy('modules.py', os.path.join(result, 'modules.py'))
 shutil.copy('updaters.py', os.path.join(result, 'updaters.py'))
 shutil.copy('opt.py', os.path.join(result, 'opt.py'))
 shutil.copy('generate.py', os.path.join(result, 'generate.py'))
+shutil.copy('fast_generation_test.py',
+            os.path.join(result, 'fast_generation_test.py'))
 
 # Model
 model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.n_channel1, opt.n_channel2, opt.n_channel3,
+            opt.residual_channels, opt.dilated_channels, opt.skip_channels,
             opt.beta, n_speaker)
 
 # Optimizer
@@ -116,7 +120,7 @@ trainer.extend(extensions.PlotReport(
 trainer.extend(extensions.PlotReport(
     ['main/loss3', 'validation/main/loss3'],
     'iteration', file_name='loss3.png', trigger=opt.report_interval))
-trainer.extend(extensions.ProgressBar(update_interval=100))
+trainer.extend(extensions.ProgressBar(update_interval=1))
 
 if args.resume:
     chainer.serializers.load_npz(args.resume, trainer)

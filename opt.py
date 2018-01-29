@@ -25,9 +25,9 @@ k = 128
 n_loop = 3
 n_layer = 10
 n_filter = 2
-n_channel1 = 256
-n_channel2 = 512
-n_channel3 = 256
+residual_channels = 256
+dilated_channels = 512
+skip_channels = 256
 
 # parameters of losses
 beta = 0.25
