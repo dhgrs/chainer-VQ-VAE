@@ -71,12 +71,12 @@ class VAE(chainer.Chain):
         one_hot = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
         self.dec.initialize(1, global_cond)
-        length = e.shape[2]
+        length = local_cond.shape[2]
 
         # generate
         for i in range(length-1):
             with chainer.using_config('enable_backprop', False):
-                out = self.dec.generate(one_hot, e[:, :, i:i+1])
+                out = self.dec.generate(one_hot, local_cond[:, :, i:i+1])
             zeros = self.xp.zeros_like(one_hot.array)
             value = self.xp.random.choice(
                 self.quantize, p=F.softmax(out).array[0, :, 0, 0])
