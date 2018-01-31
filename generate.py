@@ -35,7 +35,7 @@ speaker_dic = {
 model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
             opt.residual_channels, opt.dilated_channels, opt.skip_channels,
             opt.beta, n_speaker)
-
+chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 # preprocess
 n = 1
 inputs = Preprocess(
