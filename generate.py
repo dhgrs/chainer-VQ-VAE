@@ -14,6 +14,7 @@ import opt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', '-i', help='input file')
+parser.add_argument('--output', '-o', help='output file')
 parser.add_argument('--model', '-m', help='snapshot of trained model')
 parser.add_argument('--speaker', '-s', default=None,
                     help='name of speaker. if this is None,'
@@ -40,7 +41,7 @@ chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 n = 1
 inputs = Preprocess(
     opt.data_format, opt.sr, opt.mu, opt.top_db,
-    opt.length, opt.dataset, speaker_dic, False)(path)
+    None, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs
 raw = numpy.expand_dims(raw, 0)
@@ -60,5 +61,4 @@ quantized = numpy.expand_dims(quantized, 0)
 # forward
 output = model.generate(raw, speaker)
 wave = mu_law(opt.mu).itransform(output)
-numpy.save('result.npy', wave)
-librosa.output.write_wav('result.wav', wave, opt.sr)
+librosa.output.write_wav(args.output, wave, opt.sr)

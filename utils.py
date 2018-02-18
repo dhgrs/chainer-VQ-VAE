@@ -33,7 +33,10 @@ class Preprocess(object):
         self.mu = mu
         self.mu_law = mu_law(mu)
         self.top_db = top_db
-        self.length = length + 1
+        if length is None:
+            self.length = None
+        else:
+            self.length = length + 1
         self.dataset = dataset
         self.speaker_dic = speaker_dic
         self.random = random
@@ -46,22 +49,23 @@ class Preprocess(object):
 
         quantized = self.mu_law.transform(raw)
 
-        if len(raw) <= self.length:
-            # padding
-            pad = self.length-len(raw)
-            raw = np.concatenate(
-                (raw, np.zeros(pad, dtype=np.float32)))
-            quantized = np.concatenate(
-                (quantized, self.mu // 2 * np.ones(pad, dtype=np.int32)))
-        else:
-            # triming
-            if self.random:
-                start = random.randint(0, len(raw) - self.length-1)
-                raw = raw[start:start + self.length]
-                quantized = quantized[start:start + self.length]
+        if self.length is not None:
+            if len(raw) <= self.length:
+                # padding
+                pad = self.length-len(raw)
+                raw = np.concatenate(
+                    (raw, np.zeros(pad, dtype=np.float32)))
+                quantized = np.concatenate(
+                    (quantized, self.mu // 2 * np.ones(pad, dtype=np.int32)))
             else:
-                raw = raw[:self.length]
-                quantized = quantized[:self.length]
+                # triming
+                if self.random:
+                    start = random.randint(0, len(raw) - self.length-1)
+                    raw = raw[start:start + self.length]
+                    quantized = quantized[start:start + self.length]
+                else:
+                    raw = raw[:self.length]
+                    quantized = quantized[:self.length]
 
         # expand dimension
         raw = raw.reshape((1, -1, 1))
@@ -71,10 +75,17 @@ class Preprocess(object):
 
         # get speaker-id
         if self.dataset == 'VCTK':
-            speaker = self.speaker_dic[os.path.basename(os.path.dirname(path))]
+            try:
+                speaker = self.speaker_dic[
+                    os.path.basename(os.path.dirname(path))]
+            except:
+                speaker = None
         elif self.dataset == 'ARCTIC':
-            speaker = self.speaker_dic[
-                os.path.basename(os.path.dirname(os.path.dirname(path)))]
+            try:
+                speaker = self.speaker_dic[
+                    os.path.basename(os.path.dirname(os.path.dirname(path)))]
+            except:
+                speaker = None
         speaker = np.int32(speaker)
         return raw[:, :-1, :], one_hot[:, :-1, :], speaker, quantized[1:, :]
 
