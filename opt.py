@@ -28,6 +28,7 @@ n_filter = 2
 residual_channels = 256
 dilated_channels = 512
 skip_channels = 256
+embed_channels = 128
 
 # parameters of losses
 beta = 0.25

@@ -29,7 +29,7 @@ class Encoder(chainer.Chain):
 class VAE(chainer.Chain):
     def __init__(self, d, k, n_loop, n_layer, n_filter, quantize,
                  residual_channels, dilated_channels,
-                 skip_channels, beta, n_speaker):
+                 skip_channels, embed_channels, beta, n_speaker):
         super(VAE, self).__init__()
         self.beta = beta
         self.quantize = quantize
@@ -38,7 +38,7 @@ class VAE(chainer.Chain):
             self.vq = VQ(k)
             self.dec = WaveNet(
                 n_loop, n_layer, n_filter, quantize, residual_channels,
-                dilated_channels, skip_channels, n_speaker, d)
+                dilated_channels, skip_channels, embed_channels, n_speaker, d)
 
     def __call__(self, raw, one_hot, speaker, quantized):
         # forward

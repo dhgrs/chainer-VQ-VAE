@@ -69,7 +69,7 @@ shutil.copy('fast_generation_test.py',
 # Model
 model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
             opt.residual_channels, opt.dilated_channels, opt.skip_channels,
-            opt.beta, n_speaker)
+            opt.embed_channels, opt.beta, n_speaker)
 
 # Optimizer
 optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))

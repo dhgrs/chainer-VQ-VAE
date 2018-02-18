@@ -103,14 +103,14 @@ class VQ(chainer.link.Link):
 
 class ResidualBlock(chainer.Chain):
     def __init__(self, dilation, residual_channels, dilated_channels,
-                 skip_channels, n_speaker, d):
+                 skip_channels, embed_channels, d):
         super(ResidualBlock, self).__init__()
         with self.init_scope():
             self.conv = L.DilatedConvolution2D(
                 residual_channels, dilated_channels * 2,
                 ksize=(2, 1), pad=(dilation, 0), dilate=(dilation, 1))
-            self.global_cond_embed = L.EmbedID(
-                n_speaker, dilated_channels * 2)
+            self.global_cond_embed = L.Linear(
+                embed_channels, dilated_channels * 2)
             self.local_cond_conv = L.DilatedConvolution2D(
                 d, dilated_channels * 2,
                 ksize=(2, 1), pad=(dilation, 0), dilate=(dilation, 1))
@@ -180,14 +180,14 @@ class ResidualBlock(chainer.Chain):
 
 class ResidualNet(chainer.ChainList):
     def __init__(self, n_loop, n_layer, n_filter, residual_channels,
-                 dilated_channels, skip_channels, n_speaker, d):
+                 dilated_channels, skip_channels, embed_channels, d):
         super(ResidualNet, self).__init__()
         dilations = [
             n_filter ** i for j in range(n_loop) for i in range(n_layer)]
         for i, dilation in enumerate(dilations):
             self.add_link(
                 ResidualBlock(dilation, residual_channels, dilated_channels,
-                              skip_channels, n_speaker, d))
+                              skip_channels, embed_channels, d))
 
     def __call__(self, x, global_cond, local_cond):
         for i, func in enumerate(self.children()):
@@ -215,16 +215,17 @@ class ResidualNet(chainer.ChainList):
 
 class WaveNet(chainer.Chain):
     def __init__(self, n_loop, n_layer, n_filter, quantize, residual_channels,
-                 dilated_channels, skip_channels, n_speaker, d):
+                 dilated_channels, skip_channels, embed_channels, n_speaker, d):
         super(WaveNet, self).__init__()
         with self.init_scope():
             self.caus = L.Convolution2D(
                 quantize, residual_channels, (2, 1), pad=(1, 0))
             self.resb = ResidualNet(
                 n_loop, n_layer, n_filter, residual_channels, dilated_channels,
-                skip_channels, n_speaker, d)
+                skip_channels, embed_channels, d)
             self.proj1 = L.Convolution2D(skip_channels, skip_channels, 1)
             self.proj2 = L.Convolution2D(skip_channels, quantize, 1)
+            self.embed = L.EmbedID(n_speaker, embed_channels)
         self.n_layer = n_layer
         self.quantize = quantize
         self.residual_channels = residual_channels
@@ -237,7 +238,7 @@ class WaveNet(chainer.Chain):
         x = x[:, :, :length, :]
 
         # Residual & Skip-conenection
-        z = F.relu(self.resb(x, global_cond, local_cond))
+        z = F.relu(self.resb(x, self.embed(global_cond), local_cond))
 
         # Output
         z = F.relu(self.proj1(z))
@@ -245,7 +246,7 @@ class WaveNet(chainer.Chain):
         return y
 
     def initialize(self, n, global_cond):
-        self.resb.initialize(n, global_cond)
+        self.resb.initialize(n, self.embed(global_cond))
         self.caus.pad = (0, 0)
         self.caus_queue = chainer.Variable(
             self.xp.zeros((n, self.quantize, 2, 1), dtype=self.xp.float32))
