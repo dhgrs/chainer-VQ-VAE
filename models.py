@@ -80,7 +80,7 @@ class VAE(chainer.Chain):
             zeros = self.xp.zeros_like(one_hot.array)
             value = self.xp.random.choice(
                 self.quantize, size=1, p=F.softmax(out).array[0, :, 0, 0])
-            output[i] = value
+            output[i:i+1] = value
             zeros[:, value, :, :] = 1
             one_hot = chainer.Variable(zeros)
         return output
