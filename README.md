@@ -1,11 +1,33 @@
 # chainer-VQ-VAE
 A Chainer implementation of VQ-VAE( https://arxiv.org/abs/1711.00937 ).
 
-# Requirements
-- python3
-- chainer v3
-- librosa
+# Results
+Trained 165000 iterations on CMU ARCTIC. You can reproduce these results in Google Colaboratory.
 
+Losses:
+
+![loss1](loss1.png)
+![loss2](loss2.png)
+![loss3](loss3.png)
+
+Audios:
+
+[Input](http://nana-music.com/sounds/037eb33f/])
+
+[Target speaker](http://nana-music.com/sounds/0383457c/)
+
+[Reconstruct(decode with input speaker)](http://nana-music.com/sounds/037eb451/)
+
+[Voice Conversion(decoce with target speaker)](http://nana-music.com/sounds/037eb39a/)
+
+# Requirements
+I trained and generated with
+
+- python(3.5.2)
+- chainer(4.0.0b3)
+- librosa(0.5.1)
+
+And now you can try it on Google Colaboratory. You don't need install chainer/librosa or buy GPUs. Check [this](colaboratory.md).
 # Usage
 ## download dataset
 You can download VCTK-Corpus from [here](http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html). And you can download CMU-ARCTIC very easily via [my repository](https://github.com/dhgrs/download_dataset).
@@ -95,7 +117,7 @@ python generate.py -i <input file> -o <output file> -m <trained model> -s <speak
 If you don't set `-o`, default file name `result.wav` is used. If you don't set `-s`, the speaker is same as input file that got from filepath.
 
 # TODO
-- [ ] upload generated sample
+- [x] upload generated sample
     - Current uploaded sample is old version and very poor quality. Now training newest parameters and getting good results. Please wait!
 - [x] using GPU fot generating
     - Now only CPU is used for generating.
