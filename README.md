@@ -27,7 +27,7 @@ I trained and generated with
 - chainer(4.0.0b3)
 - librosa(0.5.1)
 
-And now you can try it on Google Colaboratory. You don't need install chainer/librosa or buy GPUs. Check [this](colaboratory.md).
+And now you can try it on Google Colaboratory. You don't need install chainer/librosa or buy GPUs. Check [this](Colaboratory/README.md).
 # Usage
 ## download dataset
 You can download VCTK-Corpus from [here](http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html). And you can download CMU-ARCTIC very easily via [my repository](https://github.com/dhgrs/download_dataset).
