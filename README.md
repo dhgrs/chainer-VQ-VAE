@@ -38,6 +38,8 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - Batch size.
 - lr
     - Learning rate.
+- update_encoder
+    - Update encoder or not. If you use small dataset like CMU-ARCTIC(en)/voice-statistics-corpus(ja), the encoder of VQ-VAE may cause over-fitting. So after about 150-200k iterations, set this parameter False and restart training.
 - trigger
     - How many times you update the model. You can set this parameter like as (`<int>`, 'iteration') or (`<int>`, 'epoch')
 - evaluate_interval

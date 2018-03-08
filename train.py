@@ -78,6 +78,8 @@ model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
 # Optimizer
 optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
 optimizer.setup(model)
+if not opt.update_encoder:
+    model.enc.disable_update()
 
 # Iterator
 if args.process * args.prefetch > 1:
