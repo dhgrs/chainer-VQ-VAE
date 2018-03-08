@@ -28,6 +28,8 @@ if opt.dataset == 'VCTK':
     speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
 elif opt.dataset == 'ARCTIC':
     speakers = glob.glob(os.path.join(opt.root, '*'))
+elif opt.dataset == 'vs':
+    speakers = glob.glob(os.path.join(opt.root, '*'))
 path = args.input
 
 n_speaker = len(speakers)

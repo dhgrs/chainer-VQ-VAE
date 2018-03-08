@@ -88,6 +88,13 @@ class Preprocess(object):
                 speaker = np.int32(speaker)
             except:
                 speaker = None
+        elif self.dataset == 'vs':
+            try:
+                speaker = self.speaker_dic[
+                    os.path.basename(os.path.dirname(path))]
+                speaker = np.int32(speaker)
+            except:
+                speaker = None
         return raw[:, :-1, :], one_hot[:, :-1, :], speaker, quantized[1:, :]
 
     def read_file(self, path):

@@ -17,6 +17,9 @@ if opt.dataset == 'VCTK':
 elif opt.dataset == 'ARCTIC':
     speakers = glob.glob(os.path.join(opt.root, '*'))
     path = os.path.join(opt.root, 'cmu_us_bdl_arctic/wav/arctic_a0001.wav')
+elif opt.dataset == 'vs':
+    speakers = glob.glob(os.path.join(opt.root, '*'))
+    path = os.path.join(opt.root, 'fujitou_normal/fujitou_normal_001.wav')
 
 n_speaker = len(speakers)
 speaker_dic = {

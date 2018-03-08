@@ -30,7 +30,7 @@ I trained and generated with
 And now you can try it on Google Colaboratory. You don't need install chainer/librosa or buy GPUs. Check [this](Colaboratory/README.md).
 # Usage
 ## download dataset
-You can download VCTK-Corpus from [here](http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html). And you can download CMU-ARCTIC very easily via [my repository](https://github.com/dhgrs/download_dataset).
+You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html). And you can download CMU-ARCTIC(en)/voice-statistics-corpus(ja) very easily via [my repository](https://github.com/dhgrs/download_dataset).
 
 ## set parameters
 ### parameters of training
@@ -51,7 +51,7 @@ You can download VCTK-Corpus from [here](http://homepages.inf.ed.ac.uk/jyamagis/
 - root
     - The root directory of training dataset.
 - dataset
-    - The architecture of the directory of training dataset. Now this parameter supports `VCTK` and `ARCTIC`
+    - The architecture of the directory of training dataset. Now this parameter supports `VCTK`, `ARCTIC` and 'vs'.
 - data_format
     - The file format of files in training dataset. You can use formats which librosa supports.
 - sr

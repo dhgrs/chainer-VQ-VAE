@@ -33,8 +33,10 @@ args = parser.parse_args()
 
 # get speaker dictionary
 if opt.dataset == 'VCTK':
-    speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
+    speakers = glob.glob(os.path.join(opt.root, 'wav48/*/'))
 elif opt.dataset == 'ARCTIC':
+    speakers = glob.glob(os.path.join(opt.root, '*/'))
+elif opt.dataset == 'vs':
     speakers = glob.glob(os.path.join(opt.root, '*'))
 n_speaker = len(speakers)
 speaker_dic = {
@@ -45,6 +47,8 @@ if opt.dataset == 'VCTK':
     files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
 elif opt.dataset == 'ARCTIC':
     files = glob.glob(os.path.join(opt.root, '*/wav/*.wav'))
+elif opt.dataset == 'vs':
+    files = glob.glob(os.path.join(opt.root, '*/*.wav'))
 
 preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.top_db,
                         opt.length, opt.dataset, speaker_dic)
