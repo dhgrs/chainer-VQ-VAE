@@ -1,7 +1,7 @@
 # parameters of training
 batchsize = 1
 lr = 2e-4
-update_encoder = False
+update_encoder = True
 trigger = (200000, 'iteration')
 evaluate_interval = (1, 'epoch')
 snapshot_interval = (1000, 'iteration')
