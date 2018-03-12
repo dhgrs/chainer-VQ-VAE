@@ -80,6 +80,7 @@ optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
 optimizer.setup(model)
 if not opt.update_encoder:
     model.enc.disable_update()
+    model.vq.disable_update()
 
 # Iterator
 if args.process * args.prefetch > 1:
