@@ -18,14 +18,14 @@ data_format = 'wav'
 sr = 16000
 mu = 256
 top_db = 20
-length = 10240
+length = 7680
 
 # parameters of VQ
 d = 512
 k = 128
 
 # parameters of Decoder(WaveNet)
-n_loop = 4
+n_loop = 3
 n_layer = 10
 n_filter = 2
 residual_channels = 64
