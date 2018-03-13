@@ -49,7 +49,8 @@ with chainer.using_config('enable_backprop', False):
     z = model1.enc(raw)
     e = model1.vq(z)
     global_cond = speaker
-    local_cond = chainer.functions.unpooling_2d(e, (64, 1), cover_all=False)
+    # local_cond = chainer.functions.unpooling_2d(e, (64, 1), cover_all=False)
+    local_cond = model1.upsample(e)
 model1.dec.initialize(n, global_cond)
 
 print('check fast generation and naive generation')

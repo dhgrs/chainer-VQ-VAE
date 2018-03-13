@@ -35,6 +35,7 @@ class VAE(chainer.Chain):
         self.quantize = quantize
         with self.init_scope():
             self.enc = Encoder(d)
+            self.upsample = L.Deconvolution2D(d, d, (64, 1), (64, 1))
             self.vq = VQ(k)
             self.dec = WaveNet(
                 n_loop, n_layer, n_filter, quantize, residual_channels,
@@ -47,7 +48,8 @@ class VAE(chainer.Chain):
         e_ = self.vq(chainer.Variable(z.data))
         scale = one_hot.shape[2] // e.shape[2]
         global_cond = speaker
-        local_cond = F.unpooling_2d(e, (scale, 1), cover_all=False)
+        # local_cond = F.unpooling_2d(e, (scale, 1), cover_all=False)
+        local_cond = self.upsample(e)
         y = self.dec(one_hot, global_cond, local_cond)
 
         # calculate loss
@@ -67,7 +69,8 @@ class VAE(chainer.Chain):
             z = self.enc(raw)
             e = self.vq(z)
             global_cond = speaker
-            local_cond = F.unpooling_2d(e, (64, 1), cover_all=False)
+            # local_cond = F.unpooling_2d(e, (64, 1), cover_all=False)
+            local_cond = self.upsample(e)
         one_hot = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
         self.dec.initialize(1, global_cond)
