@@ -1,5 +1,5 @@
 # parameters of training
-batchsize = 1
+batchsize = 2
 lr = 2e-4
 update_encoder = True
 trigger = (200000, 'iteration')
@@ -28,9 +28,9 @@ k = 128
 n_loop = 3
 n_layer = 10
 n_filter = 2
-residual_channels = 64
-dilated_channels = 64
-skip_channels = 256
+residual_channels = 32
+dilated_channels = 32
+skip_channels = 128
 embed_channels = 128
 
 # parameters of losses
