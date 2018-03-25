@@ -28,9 +28,9 @@ k = 128
 n_loop = 3
 n_layer = 10
 n_filter = 2
-residual_channels = 32
-dilated_channels = 32
-skip_channels = 128
+residual_channels = 256
+dilated_channels = 256
+skip_channels = 512
 embed_channels = 128
 
 # parameters of losses
