@@ -126,7 +126,7 @@ class ResidualBlock(chainer.Chain):
         length = x.shape[2]
 
         # Dilated conv
-        h = self.conv(x)
+        h = self.conv(F.dropout(x, ratio=0.05))
         h = h[:, :, :length]
 
         # global condition
@@ -137,8 +137,7 @@ class ResidualBlock(chainer.Chain):
             generating = False
             global_cond = self.global_cond_embed(global_cond)
             global_cond = F.reshape(global_cond, global_cond.shape + (1, 1))
-        global_cond = F.dropout(
-            F.broadcast_to(global_cond, h.shape), ratio=0.05)
+        global_cond = F.broadcast_to(global_cond, h.shape)
 
         # local condition
         local_cond = self.local_cond_conv(local_cond)
