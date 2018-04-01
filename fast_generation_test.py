@@ -12,13 +12,13 @@ import opt
 
 # set data
 if opt.dataset == 'VCTK':
-    speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, 'wav48/*')))
     path = os.path.join(opt.root, 'wav48/p225/p225_001.wav')
 elif opt.dataset == 'ARCTIC':
-    speakers = glob.glob(os.path.join(opt.root, '*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, '*')))
     path = os.path.join(opt.root, 'cmu_us_bdl_arctic/wav/arctic_a0001.wav')
 elif opt.dataset == 'vs':
-    speakers = glob.glob(os.path.join(opt.root, '*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, '*')))
     path = os.path.join(opt.root, 'fujitou_normal/fujitou_normal_001.wav')
 
 n_speaker = len(speakers)
