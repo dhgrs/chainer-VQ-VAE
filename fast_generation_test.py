@@ -26,15 +26,17 @@ speaker_dic = {
     os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
 
 # make model
-model1 = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-             opt.residual_channels, opt.dilated_channels, opt.skip_channels,
-             opt.embed_channels, opt.beta, n_speaker)
+model1 = VAE(
+    opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
+    opt.residual_channels, opt.dilated_channels, opt.skip_channels,
+    opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
+    opt.embed_channels, opt.dropout_zero_rate, opt.beta)
 model2 = model1.copy()
 
 # preprocess
 n = 1
 inputs = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db,
+    opt.data_format, opt.sr, opt.quantize, opt.top_db,
     opt.length, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs
@@ -48,9 +50,8 @@ quantized = numpy.expand_dims(quantized, 0)
 with chainer.using_config('enable_backprop', False):
     z = model1.enc(raw)
     e = model1.vq(z)
-    global_cond = speaker
-    # local_cond = chainer.functions.unpooling_2d(e, (64, 1), cover_all=False)
-    local_cond = model1.upsample(e)
+    global_cond = model1.dec.embed_global_cond(speaker)
+    local_cond = model1.dec.upsample_local_cond(e)
 model1.dec.initialize(n, global_cond)
 
 print('check fast generation and naive generation')
@@ -59,7 +60,8 @@ for i in range(opt.sr):
         out1 = model1.dec.generate(
             one_hot[:, :, i:i+1], local_cond[:, :, i:i+1])
         out2 = model2.dec(
-            one_hot[:, :, :i+1], global_cond, local_cond[:, :, :i+1])
+            one_hot[:, :, :i+1], global_cond, local_cond[:, :, :i+1],
+            generating=True)
         print(
             '{}th sample, both of the values are same?:'.format(i),
             numpy.allclose(numpy.squeeze(out1.array),

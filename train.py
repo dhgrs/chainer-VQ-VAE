@@ -13,6 +13,7 @@ import chainer
 from chainer.training import extensions
 
 from utils import Preprocess
+from utils import ExponentialMovingAverage
 from models import VAE
 from updaters import VQVAE_StandardUpdater
 from updaters import VQVAE_ParallelUpdater
@@ -42,6 +43,9 @@ n_speaker = len(speakers)
 speaker_dic = {
     os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
 
+if args.gpus != [-1]:
+    chainer.cuda.get_device_from_id(args.gpus[0]).use()
+
 # get paths
 if opt.dataset == 'VCTK':
     files = glob.glob(os.path.join(opt.root, 'wav48/*/*.wav'))
@@ -50,7 +54,7 @@ elif opt.dataset == 'ARCTIC':
 elif opt.dataset == 'vs':
     files = glob.glob(os.path.join(opt.root, '*/*.wav'))
 
-preprocess = Preprocess(opt.data_format, opt.sr, opt.mu, opt.top_db,
+preprocess = Preprocess(opt.data_format, opt.sr, opt.quantize, opt.top_db,
                         opt.length, opt.dataset, speaker_dic)
 
 dataset = chainer.datasets.TransformDataset(files, preprocess)
@@ -71,9 +75,11 @@ shutil.copy('fast_generation_test.py',
             os.path.join(result, 'fast_generation_test.py'))
 
 # Model
-model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.residual_channels, opt.dilated_channels, opt.skip_channels,
-            opt.embed_channels, opt.beta, n_speaker)
+model = VAE(
+    opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
+    opt.residual_channels, opt.dilated_channels, opt.skip_channels,
+    opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
+    opt.embed_channels, opt.dropout_zero_rate, opt.beta)
 
 # Optimizer
 optimizer = chainer.optimizers.Adam(opt.lr/len(args.gpus))
@@ -81,6 +87,8 @@ optimizer.setup(model)
 if not opt.update_encoder:
     model.enc.disable_update()
     model.vq.disable_update()
+# if opt.ema_mu < 1:
+#     model = ExponentialMovingAverage(model, opt.ema_mu)
 
 # Iterator
 if args.process * args.prefetch > 1:
@@ -99,7 +107,6 @@ else:
 if args.gpus == [-1]:
     updater = VQVAE_StandardUpdater(train_iter, optimizer)
 else:
-    chainer.cuda.get_device_from_id(args.gpus[0]).use()
     names = ['main'] + list(range(len(args.gpus)-1))
     devices = {str(name): gpu for name, gpu in zip(names, args.gpus)}
     updater = VQVAE_ParallelUpdater(

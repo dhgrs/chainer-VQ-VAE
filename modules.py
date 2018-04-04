@@ -1,7 +1,6 @@
 import chainer
 import chainer.functions as F
 import chainer.links as L
-import numpy
 
 
 class StraightThrough(chainer.function_node.FunctionNode):
@@ -102,92 +101,113 @@ class VQ(chainer.link.Link):
 
 
 class ResidualBlock(chainer.Chain):
-    def __init__(self, dilation, residual_channels, dilated_channels,
-                 skip_channels, embed_channels, d):
+    def __init__(self, filter_size, dilation, residual_channels,
+                 dilated_channels, skip_channels, global_conditioned,
+                 local_conditioned, embed_dim, local_condition_dim,
+                 dropout_zero_rate):
         super(ResidualBlock, self).__init__()
         with self.init_scope():
             self.conv = L.DilatedConvolution2D(
                 residual_channels, dilated_channels * 2,
-                ksize=(2, 1), pad=(dilation, 0), dilate=(dilation, 1))
-            self.global_cond_embed = L.Linear(
-                embed_channels, dilated_channels * 2)
-            self.local_cond_conv = L.DilatedConvolution2D(
-                d, dilated_channels * 2,
-                ksize=(2, 1), pad=(dilation, 0), dilate=(dilation, 1))
+                ksize=(filter_size, 1),
+                pad=(dilation * (filter_size - 1), 0), dilate=(dilation, 1))
+            if global_conditioned:
+                self.global_cond_proj = L.Convolution2D(
+                    embed_dim, dilated_channels * 2, 1)
+            if local_conditioned:
+                self.local_cond_proj = L.Convolution2D(
+                    local_condition_dim, dilated_channels * 2, 1)
             self.res = L.Convolution2D(dilated_channels, residual_channels, 1)
             self.skip = L.Convolution2D(dilated_channels, skip_channels, 1)
 
+        self.filter_size = filter_size
         self.dilation = dilation
         self.residual_channels = residual_channels
         self.dilated_channels = dilated_channels
-        self.d = d
+        self.global_conditioned = global_conditioned
+        self.local_conditioned = local_conditioned
+        self.local_condition_dim = local_condition_dim
+        self.dropout_zero_rate = dropout_zero_rate
 
     def __call__(self, x, global_cond, local_cond):
         length = x.shape[2]
 
         # Dilated conv
-        h = self.conv(F.dropout(x, ratio=0.05))
+        h = self.conv(x)
         h = h[:, :, :length]
 
         # global condition
-        if global_cond is None:
-            generating = True
-            global_cond = self.global_cond
-        else:
-            generating = False
-            global_cond = self.global_cond_embed(global_cond)
-            global_cond = F.reshape(global_cond, global_cond.shape + (1, 1))
-        global_cond = F.broadcast_to(global_cond, h.shape)
+        if self.global_conditioned:
+            if global_cond is None:
+                global_cond = self.global_cond
+            else:
+                global_cond = self.global_cond_proj(global_cond)
+                global_cond = F.broadcast_to(global_cond, h.shape)
+            h += global_cond
 
         # local condition
-        local_cond = self.local_cond_conv(local_cond)
-        local_cond = local_cond[:, :, :length]
+        if self.local_conditioned:
+            if local_cond is not None:
+                local_cond = self.local_cond_proj(local_cond)
+                h += local_cond
+            else:
+                print('local condition is not feed')
 
         # Gated activation units
-        z = h + global_cond + local_cond
-        tanh_z, sig_z = F.split_axis(z, 2, axis=1)
+        if self.dropout_zero_rate:
+            h = F.dropout(h, ratio=self.dropout_zero_rate)
+        tanh_z, sig_z = F.split_axis(h, 2, axis=1)
         z = F.tanh(tanh_z) * F.sigmoid(sig_z)
 
         # Projection
-        if generating:
-            residual = self.res(z) + x[:, :, -1:]
-        else:
+        if x.shape[2] == z.shape[2]:
             residual = self.res(z) + x
+        else:
+            residual = self.res(z) + x[:, :, -1:]
         skip_conenection = self.skip(z)
         return residual, skip_conenection
 
     def initialize(self, n, global_cond):
-        self.queue = chainer.Variable(
-            self.xp.zeros((n, self.residual_channels, self.dilation + 1, 1),
-                          dtype=self.xp.float32))
-        self.local_cond_queue = chainer.Variable(
-            self.xp.zeros((n, self.d, self.dilation+1, 1),
-                          dtype=self.xp.float32))
+        self.queue = chainer.Variable(self.xp.zeros((
+            n, self.residual_channels,
+            self.dilation * (self.filter_size - 1) + 1, 1),
+            dtype=self.xp.float32))
         self.conv.pad = (0, 0)
-        self.local_cond_conv.pad = (0, 0)
-        self.global_cond = self.global_cond_embed(global_cond)
-        self.global_cond = F.reshape(
-            self.global_cond, self.global_cond.shape + (1, 1))
+        if self.local_conditioned:
+            self.local_cond_queue = chainer.Variable(
+                self.xp.zeros(
+                    (n, self.local_condition_dim, 1, 1),
+                    dtype=self.xp.float32))
+        else:
+            self.local_cond_queue = None
+        if self.global_conditioned:
+            self.global_cond = self.global_cond_proj(global_cond)
+        else:
+            self.global_cond = None
 
     def pop(self):
         return self(self.queue, None, self.local_cond_queue)
 
     def push(self, x, local_cond):
         self.queue = F.concat((self.queue[:, :, 1:], x), axis=2)
-        self.local_cond_queue = F.concat(
-            (self.local_cond_queue[:, :, 1:], local_cond), axis=2)
+        if self.local_conditioned:
+            self.local_cond_queue = F.concat(
+                (self.local_cond_queue[:, :, 1:], local_cond), axis=2)
 
 
 class ResidualNet(chainer.ChainList):
-    def __init__(self, n_loop, n_layer, n_filter, residual_channels,
-                 dilated_channels, skip_channels, embed_channels, d):
+    def __init__(self, n_loop, n_layer, filter_size, residual_channels,
+                 dilated_channels, skip_channels, global_conditioned,
+                 local_conditioned, embed_dim, local_condition_dim,
+                 dropout_zero_rate):
         super(ResidualNet, self).__init__()
         dilations = [
-            n_filter ** i for j in range(n_loop) for i in range(n_layer)]
+            2 ** i for j in range(n_loop) for i in range(n_layer)]
         for i, dilation in enumerate(dilations):
-            self.add_link(
-                ResidualBlock(dilation, residual_channels, dilated_channels,
-                              skip_channels, embed_channels, d))
+            self.add_link(ResidualBlock(
+                filter_size, dilation, residual_channels, dilated_channels,
+                skip_channels, global_conditioned, local_conditioned,
+                embed_dim, local_condition_dim, dropout_zero_rate))
 
     def __call__(self, x, global_cond, local_cond):
         for i, func in enumerate(self.children()):
@@ -205,6 +225,7 @@ class ResidualNet(chainer.ChainList):
     def generate(self, x, local_cond):
         for i, func in enumerate(self.children()):
             func.push(x, local_cond)
+            # print(i, x.shape)
             x, skip = func.pop()
             if i == 0:
                 skip_connections = skip
@@ -214,52 +235,183 @@ class ResidualNet(chainer.ChainList):
 
 
 class WaveNet(chainer.Chain):
-    def __init__(self, n_loop, n_layer, n_filter, quantize, residual_channels,
-                 dilated_channels, skip_channels, embed_channels, n_speaker, d):
+    def __init__(self, n_loop, n_layer, filter_size, quantize,
+                 residual_channels, dilated_channels, skip_channels,
+                 use_logistic, global_conditioned, local_conditioned,
+                 # arguments for mixture of logistics
+                 n_mixture, log_scale_min,
+                 # arguments for global condition
+                 n_speaker, embed_dim,
+                 # arguments for local conditon
+                 local_condition_dim, upsample_factor, use_deconv,
+                 # arguments for dropout
+                 dropout_zero_rate):
         super(WaveNet, self).__init__()
         with self.init_scope():
-            self.caus = L.Convolution2D(
-                quantize, residual_channels, (2, 1), pad=(1, 0))
+            if local_conditioned and use_deconv:
+                self.upsample = L.Deconvolution2D(
+                    local_condition_dim, local_condition_dim,
+                    (upsample_factor, 1), (upsample_factor, 1))
+
+            if global_conditioned:
+                self.embed = L.EmbedID(n_speaker, embed_dim)
+
+            if use_logistic:
+                self.caus = L.Convolution2D(
+                    1, residual_channels, (2, 1), pad=(1, 0))
+            else:
+                self.caus = L.Convolution2D(
+                    quantize, residual_channels, (2, 1), pad=(1, 0))
+
             self.resb = ResidualNet(
-                n_loop, n_layer, n_filter, residual_channels, dilated_channels,
-                skip_channels, embed_channels, d)
+                n_loop, n_layer, filter_size,
+                residual_channels, dilated_channels, skip_channels,
+                global_conditioned, local_conditioned,
+                embed_dim, local_condition_dim, dropout_zero_rate)
+
             self.proj1 = L.Convolution2D(skip_channels, skip_channels, 1)
-            self.proj2 = L.Convolution2D(skip_channels, quantize, 1)
-            self.embed = L.EmbedID(n_speaker, embed_channels)
+
+            if use_logistic:
+                self.proj2 = L.Convolution2D(skip_channels, n_mixture, 1)
+            else:
+                self.proj2 = L.Convolution2D(skip_channels, quantize, 1)
+
         self.n_layer = n_layer
         self.quantize = quantize
         self.residual_channels = residual_channels
         self.skip_channels = skip_channels
+        self.global_conditioned = global_conditioned
+        self.local_conditioned = local_conditioned
+        self.upsample_factor = upsample_factor
+        self.use_deconv = use_deconv
+        self.use_logistic = use_logistic
+        self.log_scale_min = log_scale_min
 
-    def __call__(self, x, global_cond, local_cond):
+    def __call__(self, x, global_cond=None, local_cond=None,
+                 generating=False):
+        if self.local_conditioned:
+            if not generating:
+                local_cond = self.upsample_local_cond(local_cond)
+        else:
+            local_cond = None
+
+        if self.global_conditioned:
+            if not generating:
+                global_cond = self.embed_global_cond(global_cond)
+        else:
+            global_cond = None
+
         # Causal Conv
         length = x.shape[2]
         x = self.caus(x)
         x = x[:, :, :length, :]
 
         # Residual & Skip-conenection
-        z = F.relu(self.resb(x, self.embed(global_cond), local_cond))
+        z = F.relu(self.resb(x, global_cond, local_cond))
 
         # Output
         z = F.relu(self.proj1(z))
         y = self.proj2(z)
         return y
 
+    def scalar_to_tensor(self, shapeortensor, scalar):
+        if hasattr(shapeortensor, 'shape'):
+            shape = shapeortensor.shape
+        else:
+            shape = shapeortensor
+        return self.xp.full(shape, scalar, dtype=self.xp.float32)
+
+    def calculate_logistic_loss(self, y_hat, y):
+        nr_mix = y_hat.shape[1] // 3
+
+        logit_probs = y_hat[:, :nr_mix]
+        means = y_hat[:, nr_mix:2 * nr_mix]
+        log_scales = y_hat[:, 2 * nr_mix:3 * nr_mix]
+        log_scales = F.maximum(
+            log_scales, self.scalar_to_tensor(log_scales, self.log_scale_min))
+
+        y = F.broadcast_to(y, means.shape)
+
+        centered_y = y - means
+        inv_stdv = F.exp(-log_scales)
+        plus_in = inv_stdv * (centered_y + 1 / (self.quantize - 1))
+        cdf_plus = F.sigmoid(plus_in)
+        min_in = inv_stdv * (centered_y - 1 / (self.quantize - 1))
+        cdf_min = F.sigmoid(min_in)
+
+        log_cdf_plus = plus_in - F.softplus(plus_in)
+        log_one_minus_cdf_min = -F.softplus(min_in)
+
+        cdf_delta = cdf_plus - cdf_min
+
+        # mid_in = inv_stdv * centered_y
+        # log_pdf_mid = mid_in - log_scales - 2 * F.softplus(mid_in)
+
+        log_probs = F.where(
+            # condition
+            y.array < self.scalar_to_tensor(y, -0.999),
+
+            # true
+            log_cdf_plus,
+
+            # false
+            F.where(
+                # condition
+                y.array > self.scalar_to_tensor(y, 0.999),
+
+                # true
+                log_one_minus_cdf_min,
+
+                # false
+                F.log(F.maximum(
+                    cdf_delta, self.scalar_to_tensor(cdf_delta, 1e-12)))
+                # F.where(
+                #     # condition
+                #     cdf_delta.array > self.scalar_to_tensor(cdf_delta, 1e-5),
+
+                #     # true
+                #     F.log(F.maximum(
+                #         cdf_delta, self.scalar_to_tensor(cdf_delta, 1e-12))),
+
+                #     # false
+                #     log_pdf_mid - self.xp.log((self.quantize - 1) / 2))
+                ))
+
+        log_probs = log_probs + F.log_softmax(logit_probs)
+        loss = -F.mean(F.logsumexp(log_probs, axis=1))
+        return loss
+
     def initialize(self, n, global_cond):
-        self.resb.initialize(n, self.embed(global_cond))
+        self.resb.initialize(n, global_cond)
         self.caus.pad = (0, 0)
-        self.caus_queue = chainer.Variable(
-            self.xp.zeros((n, self.quantize, 2, 1), dtype=self.xp.float32))
+        if self.use_logistic:
+            self.caus_queue = chainer.Variable(
+                self.xp.zeros((n, 1, 2, 1), dtype=self.xp.float32))
+        else:
+            self.caus_queue = chainer.Variable(
+                self.xp.zeros((n, self.quantize, 2, 1), dtype=self.xp.float32))
         # self.caus_queue.data[:, self.quantize//2, :, :] = 1
         self.proj1_queue = chainer.Variable(self.xp.zeros(
             (n, self.skip_channels, 1, 1), dtype=self.xp.float32))
         self.proj2_queue3 = chainer.Variable(self.xp.zeros(
             (n, self.skip_channels, 1, 1), dtype=self.xp.float32))
 
+    def upsample_local_cond(self, local_cond):
+        if self.use_deconv:
+            local_cond = self.upsample(local_cond)
+        else:
+            local_cond = F.resize_images(
+                local_cond, (local_cond.shape[2] * self.upsample_factor, 1))
+        return local_cond
+
+    def embed_global_cond(self, global_cond):
+        global_cond = self.embed(global_cond)
+        global_cond = F.reshape(global_cond, global_cond.shape + (1, 1))
+        return global_cond
+
     def generate(self, x, local_cond):
         self.caus_queue = F.concat((self.caus_queue[:, :, 1:], x), axis=2)
         x = self.caus(self.caus_queue)
-
         x = F.relu(self.resb.generate(x, local_cond))
 
         self.proj1_queue = F.concat((self.proj1_queue[:, :, 1:], x), axis=2)

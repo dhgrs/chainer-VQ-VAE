@@ -37,9 +37,21 @@ speaker_dic = {
     os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
 
 # make model
-model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.residual_channels, opt.dilated_channels, opt.skip_channels,
-            opt.embed_channels, opt.beta, n_speaker)
+model = VAE(
+    opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
+    opt.residual_channels, opt.dilated_channels, opt.skip_channels,
+    opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
+    opt.embed_channels, opt.dropout_zero_rate, opt.beta)
+
+# if opt.ema_mu < 1:
+#     if opt.use_ema:
+#         chainer.serializers.load_npz(
+#             args.model, model, 'updater/model:main/ema/')
+#     else:
+#         chainer.serializers.load_npz(
+#             args.model, model, 'updater/model:main/target/')
+# else:
+#     chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 
 if args.gpu >= 0:
@@ -52,7 +64,7 @@ else:
 # preprocess
 n = 1
 inputs = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db,
+    opt.data_format, opt.sr, opt.quantize, opt.top_db,
     None, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs

@@ -27,29 +27,32 @@ class Encoder(chainer.Chain):
 
 
 class VAE(chainer.Chain):
-    def __init__(self, d, k, n_loop, n_layer, n_filter, quantize,
-                 residual_channels, dilated_channels,
-                 skip_channels, embed_channels, beta, n_speaker):
+    def __init__(self, d, k, n_loop, n_layer, filter_size, quantize,
+                 residual_channels, dilated_channels, skip_channels,
+                 use_logistic, n_mixture, log_scale_min,
+                 n_speaker, embed_channels, dropout_zero_rate, beta):
         super(VAE, self).__init__()
         self.beta = beta
         self.quantize = quantize
         with self.init_scope():
             self.enc = Encoder(d)
-            self.upsample = L.Deconvolution2D(d, d, (64, 1), (64, 1))
             self.vq = VQ(k)
             self.dec = WaveNet(
-                n_loop, n_layer, n_filter, quantize, residual_channels,
-                dilated_channels, skip_channels, embed_channels, n_speaker, d)
+                n_loop, n_layer, filter_size, quantize, residual_channels,
+                dilated_channels, skip_channels, use_logistic,
+                global_conditioned=True, local_conditioned=True,
+                n_mixture=n_mixture, log_scale_min=log_scale_min,
+                n_speaker=n_speaker, embed_dim=embed_channels,
+                local_condition_dim=d, upsample_factor=64, use_deconv=False,
+                dropout_zero_rate=dropout_zero_rate)
 
     def __call__(self, raw, one_hot, speaker, quantized):
         # forward
         z = self.enc(raw)
         e = self.vq(z)
         e_ = self.vq(chainer.Variable(z.data))
-        scale = one_hot.shape[2] // e.shape[2]
         global_cond = speaker
-        # local_cond = F.unpooling_2d(e, (scale, 1), cover_all=False)
-        local_cond = self.upsample(e)
+        local_cond = e
         y = self.dec(one_hot, global_cond, local_cond)
 
         # calculate loss
@@ -68,9 +71,8 @@ class VAE(chainer.Chain):
         with chainer.using_config('enable_backprop', False):
             z = self.enc(raw)
             e = self.vq(z)
-            global_cond = speaker
-            # local_cond = F.unpooling_2d(e, (64, 1), cover_all=False)
-            local_cond = self.upsample(e)
+            global_cond = self.dec.embed_global_cond(speaker)
+            local_cond = self.dec.upsample_local_cond(e)
         one_hot = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
         self.dec.initialize(1, global_cond)
@@ -79,7 +81,8 @@ class VAE(chainer.Chain):
         # generate
         for i in range(length-1):
             with chainer.using_config('enable_backprop', False):
-                out = self.dec.generate(one_hot, local_cond[:, :, i:i+1])
+                out = self.dec.generate(one_hot, local_cond[:, :, i:i+1],
+                                        generating=True)
             zeros = self.xp.zeros_like(one_hot.array)
             value = self.xp.random.choice(
                 self.quantize, size=1, p=F.softmax(out).array[0, :, 0, 0])
