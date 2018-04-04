@@ -3,6 +3,7 @@ import chainer.functions as F
 import chainer.links as L
 from modules import VQ
 from modules import WaveNet
+from utils import ExponentialMovingAverage
 
 
 class Encoder(chainer.Chain):
@@ -30,14 +31,15 @@ class VAE(chainer.Chain):
     def __init__(self, d, k, n_loop, n_layer, filter_size, quantize,
                  residual_channels, dilated_channels, skip_channels,
                  use_logistic, n_mixture, log_scale_min,
-                 n_speaker, embed_channels, dropout_zero_rate, beta):
+                 n_speaker, embed_channels, dropout_zero_rate, ema_mu, beta):
         super(VAE, self).__init__()
         self.beta = beta
+        self.ema_mu = ema_mu
         self.quantize = quantize
         with self.init_scope():
             self.enc = Encoder(d)
             self.vq = VQ(k)
-            self.dec = WaveNet(
+            dec = WaveNet(
                 n_loop, n_layer, filter_size, quantize, residual_channels,
                 dilated_channels, skip_channels, use_logistic,
                 global_conditioned=True, local_conditioned=True,
@@ -45,6 +47,10 @@ class VAE(chainer.Chain):
                 n_speaker=n_speaker, embed_dim=embed_channels,
                 local_condition_dim=d, upsample_factor=64, use_deconv=False,
                 dropout_zero_rate=dropout_zero_rate)
+            if ema_mu < 1:
+                self.dec = ExponentialMovingAverage(dec, ema_mu)
+            else:
+                self.dec = dec
 
     def __call__(self, raw, one_hot, speaker, quantized):
         # forward
@@ -65,24 +71,31 @@ class VAE(chainer.Chain):
             self)
         return loss1, loss2, loss3
 
-    def generate(self, raw, speaker):
+    def generate(self, raw, speaker, use_ema):
         # initialize and encode
         output = self.xp.zeros(raw.shape[2])
+        if self.use_mu < 1:
+            if use_ema:
+                dec = self.dec.ema
+            else:
+                dec = self.dec.target
+        else:
+            dec = self.dec
+
         with chainer.using_config('enable_backprop', False):
             z = self.enc(raw)
             e = self.vq(z)
-            global_cond = self.dec.embed_global_cond(speaker)
-            local_cond = self.dec.upsample_local_cond(e)
+            global_cond = dec.embed_global_cond(speaker)
+            local_cond = dec.upsample_local_cond(e)
         one_hot = chainer.Variable(self.xp.zeros(
             self.quantize, dtype=self.xp.float32).reshape((1, -1, 1, 1)))
-        self.dec.initialize(1, global_cond)
+        dec.initialize(1, global_cond)
         length = local_cond.shape[2]
 
         # generate
         for i in range(length-1):
             with chainer.using_config('enable_backprop', False):
-                out = self.dec.generate(one_hot, local_cond[:, :, i:i+1],
-                                        generating=True)
+                out = dec.generate(one_hot, local_cond[:, :, i:i+1])
             zeros = self.xp.zeros_like(one_hot.array)
             value = self.xp.random.choice(
                 self.quantize, size=1, p=F.softmax(out).array[0, :, 0, 0])

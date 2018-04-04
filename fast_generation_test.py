@@ -30,7 +30,7 @@ model1 = VAE(
     opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
     opt.residual_channels, opt.dilated_channels, opt.skip_channels,
     opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
-    opt.embed_channels, opt.dropout_zero_rate, opt.beta)
+    opt.embed_channels, opt.dropout_zero_rate, opt.ema_mu, opt.beta)
 model2 = model1.copy()
 
 # preprocess

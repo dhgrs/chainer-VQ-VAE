@@ -41,7 +41,7 @@ model = VAE(
     opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
     opt.residual_channels, opt.dilated_channels, opt.skip_channels,
     opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
-    opt.embed_channels, opt.dropout_zero_rate, opt.beta)
+    opt.embed_channels, opt.dropout_zero_rate, opt.ema_mu, opt.beta)
 
 # if opt.ema_mu < 1:
 #     if opt.use_ema:
@@ -86,7 +86,7 @@ quantized = numpy.expand_dims(quantized, 0)
 if use_gpu:
     raw = chainer.cuda.to_gpu(raw, device=args.gpu)
     speaker = chainer.cuda.to_gpu(speaker, device=args.gpu)
-output = model.generate(raw, speaker)
+output = model.generate(raw, speaker, opt.use_ema)
 if use_gpu:
     output = chainer.cuda.to_cpu(output)
 wave = mu_law(opt.mu).itransform(output)
