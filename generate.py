@@ -89,5 +89,5 @@ if use_gpu:
 output = model.generate(raw, speaker, opt.use_ema)
 if use_gpu:
     output = chainer.cuda.to_cpu(output)
-wave = mu_law(opt.mu).itransform(output)
+wave = mu_law(opt.quantize).itransform(output)
 librosa.output.write_wav(args.output, wave, opt.sr)
