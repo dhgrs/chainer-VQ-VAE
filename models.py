@@ -74,7 +74,7 @@ class VAE(chainer.Chain):
     def generate(self, raw, speaker, use_ema):
         # initialize and encode
         output = self.xp.zeros(raw.shape[2])
-        if self.use_mu < 1:
+        if self.ema_mu < 1:
             if use_ema:
                 dec = self.dec.ema
             else:
