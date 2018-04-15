@@ -25,11 +25,11 @@ args = parser.parse_args()
 
 # set data
 if opt.dataset == 'VCTK':
-    speakers = glob.glob(os.path.join(opt.root, 'wav48/*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, 'wav48/*')))
 elif opt.dataset == 'ARCTIC':
-    speakers = glob.glob(os.path.join(opt.root, '*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, '*')))
 elif opt.dataset == 'vs':
-    speakers = glob.glob(os.path.join(opt.root, '*'))
+    speakers = sorted(glob.glob(os.path.join(opt.root, '*')))
 path = args.input
 
 n_speaker = len(speakers)
@@ -37,9 +37,21 @@ speaker_dic = {
     os.path.basename(speaker): i for i, speaker in enumerate(speakers)}
 
 # make model
-model = VAE(opt.d, opt.k, opt.n_loop, opt.n_layer, opt.n_filter, opt.mu,
-            opt.residual_channels, opt.dilated_channels, opt.skip_channels,
-            opt.embed_channels, opt.beta, n_speaker)
+model = VAE(
+    opt.d, opt.k, opt.n_loop, opt.n_layer, opt.filter_size, opt.quantize,
+    opt.residual_channels, opt.dilated_channels, opt.skip_channels,
+    opt.use_logistic, opt.n_mixture, opt.log_scale_min, n_speaker,
+    opt.embed_channels, opt.dropout_zero_rate, opt.ema_mu, opt.beta)
+
+# if opt.ema_mu < 1:
+#     if opt.use_ema:
+#         chainer.serializers.load_npz(
+#             args.model, model, 'updater/model:main/ema/')
+#     else:
+#         chainer.serializers.load_npz(
+#             args.model, model, 'updater/model:main/target/')
+# else:
+#     chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 chainer.serializers.load_npz(args.model, model, 'updater/model:main/')
 
 if args.gpu >= 0:
@@ -52,7 +64,7 @@ else:
 # preprocess
 n = 1
 inputs = Preprocess(
-    opt.data_format, opt.sr, opt.mu, opt.top_db,
+    opt.data_format, opt.sr, opt.quantize, opt.top_db,
     None, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs
@@ -74,8 +86,8 @@ quantized = numpy.expand_dims(quantized, 0)
 if use_gpu:
     raw = chainer.cuda.to_gpu(raw, device=args.gpu)
     speaker = chainer.cuda.to_gpu(speaker, device=args.gpu)
-output = model.generate(raw, speaker)
+output = model.generate(raw, speaker, opt.use_ema)
 if use_gpu:
     output = chainer.cuda.to_cpu(output)
-wave = mu_law(opt.mu).itransform(output)
+wave = mu_law(opt.quantize).itransform(output)
 librosa.output.write_wav(args.output, wave, opt.sr)
