@@ -138,5 +138,5 @@ If you don't set `-o`, default file name `result.wav` is used. If you don't set 
     - Current uploaded sample is old version and very poor quality. Now training newest parameters and getting good results. Please wait!
 - [x] using GPU fot generating
     - Now only CPU is used for generating.
-- [ ] descritized mixture of logistics
+- [x] descritized mixture of logistics
 - [ ] Parallel WaveNet
