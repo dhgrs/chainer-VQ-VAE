@@ -108,17 +108,19 @@ class ResidualBlock(chainer.Chain):
         super(ResidualBlock, self).__init__()
         with self.init_scope():
             self.conv = L.DilatedConvolution2D(
-                residual_channels, dilated_channels * 2,
+                residual_channels, dilated_channels,
                 ksize=(filter_size, 1),
                 pad=(dilation * (filter_size - 1), 0), dilate=(dilation, 1))
             if global_conditioned:
                 self.global_cond_proj = L.Convolution2D(
-                    embed_dim, dilated_channels * 2, 1)
+                    embed_dim, dilated_channels, 1)
             if local_conditioned:
                 self.local_cond_proj = L.Convolution2D(
-                    local_condition_dim, dilated_channels * 2, 1)
-            self.res = L.Convolution2D(dilated_channels, residual_channels, 1)
-            self.skip = L.Convolution2D(dilated_channels, skip_channels, 1)
+                    local_condition_dim, dilated_channels, 1)
+            self.res = L.Convolution2D(
+                dilated_channels // 2, residual_channels, 1)
+            self.skip = L.Convolution2D(
+                dilated_channels // 2, skip_channels, 1)
 
         self.filter_size = filter_size
         self.dilation = dilation
