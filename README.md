@@ -12,7 +12,7 @@ Losses:
 
 Audios:
 
-[Input](http://nana-music.com/sounds/037eb33f/])
+[Input](http://nana-music.com/sounds/037eb33f/)
 
 [Target speaker](http://nana-music.com/sounds/0383457c/)
 
@@ -38,6 +38,8 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - Batch size.
 - lr
     - Learning rate.
+- ema_mu
+    - Rate of exponential moving average. If this is greater than 1 doesn't apply.
 - update_encoder
     - Update encoder or not. If you use small dataset like CMU-ARCTIC(en)/voice-statistics-corpus(ja), the encoder of VQ-VAE may cause over-fitting. So after about 150-200k iterations, set this parameter False and restart training.
 - trigger
@@ -54,12 +56,10 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - The root directory of training dataset.
 - dataset
     - The architecture of the directory of training dataset. Now this parameter supports `VCTK`, `ARCTIC` and 'vs'.
-- data_format
-    - The file format of files in training dataset. You can use formats which librosa supports.
 - sr
     - Sampling rate. If it's different from input file, be resampled by librosa.
-- mu
-    - The parameter of Mu-Law encoding.
+- quantize
+    - If `use_logistic` is `True` it should be 2 ** 16. If `False` it should be 256.
 - top_db
     - The threshold db for triming silence.
 - length
@@ -77,19 +77,34 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
 - n_layer
     - If you want to make network like dilations [1, 2, 4, 1, 2, 4] set `n_layer` as `3`.
 - n_filter
-    - The filter size of each dilated convolution. Now supports only `2`.
+    - The filter size of each dilated convolution.
 - residual_channels
     - The number of input/output channels of residual blocks.
 - dilated_channels
     - The number of output channels of causal dilated convolution layers. This is splited into tanh and sigmoid so the number of hidden units is half of this number.
 - skip_channels
     - The number of channels of skip connections and last projection layer.
+- use_logistic
+    - If `True` use mixture of logistics.
+- n_mixture
+    - The number of logistic distribution. It is used only `use_logistic` is `True`.
+- log_scale_min
+    - The number for stability. It is used only `use_logistic` is `True`.
 - embed_channels
     - The dimension of speaker embeded-vector.
+- use_deconv
+    - If `True` use deconvolution layer. Else repeat quantized vector.
+- dropout_zero_rate
+    - The rate of `0` in dropout. If `0` doesn't apply dropout.
 
 ### parameters of losses
 - beta
     - The parameter `beta` in the paper.
+
+### parameters of losses
+- use_ema
+    - If `True` use the value of exponential moving average.
+
 
 ## training
 ```
