@@ -36,7 +36,7 @@ model2 = model1.copy()
 # preprocess
 n = 1
 inputs = Preprocess(
-    opt.data_format, opt.sr, opt.quantize, opt.top_db,
+    opt.sr, opt.quantize, opt.top_db,
     opt.length, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs

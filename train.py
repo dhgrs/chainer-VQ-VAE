@@ -54,7 +54,7 @@ elif opt.dataset == 'ARCTIC':
 elif opt.dataset == 'vs':
     files = glob.glob(os.path.join(opt.root, '*/*.wav'))
 
-preprocess = Preprocess(opt.data_format, opt.sr, opt.quantize, opt.top_db,
+preprocess = Preprocess(opt.sr, opt.quantize, opt.top_db,
                         opt.length, opt.dataset, speaker_dic)
 
 dataset = chainer.datasets.TransformDataset(files, preprocess)

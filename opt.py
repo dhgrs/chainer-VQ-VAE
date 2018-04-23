@@ -15,7 +15,6 @@ dataset = 'VCTK'
 # dataset = 'ARCTIC'
 # root = 'voice_statistics'
 # dataset = 'vs'
-data_format = 'wav'
 sr = 16000
 quantize = 256
 top_db = 20

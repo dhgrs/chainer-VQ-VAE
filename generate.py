@@ -64,7 +64,7 @@ else:
 # preprocess
 n = 1
 inputs = Preprocess(
-    opt.data_format, opt.sr, opt.quantize, opt.top_db,
+    opt.sr, opt.quantize, opt.top_db,
     None, opt.dataset, speaker_dic, False)(path)
 
 raw, one_hot, speaker, quantized = inputs
