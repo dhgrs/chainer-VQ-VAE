@@ -3,6 +3,21 @@ import chainer.functions as F
 import chainer.links as L
 
 
+class NonCausalDilatedConvNet(chainer.ChainList):
+    def __init__(self, channels):
+        super(NonCausalDilatedConvNet, self).__init__()
+        for layer, channel in enumerate(channels):
+            dilation = 2 ** layer
+            self.add_link(L.DilatedConvolution2D(
+                None, channel, (3, 1), pad=(dilation, 0),
+                dilate=(dilation, 1)))
+
+    def __call__(self, x):
+        for link in self.children():
+            x = F.relu(link(x))
+        return x
+
+
 class StraightThrough(chainer.function_node.FunctionNode):
     def check_type_forward(self, in_types):
         n_in = in_types.size()
@@ -250,10 +265,13 @@ class WaveNet(chainer.Chain):
                  dropout_zero_rate):
         super(WaveNet, self).__init__()
         with self.init_scope():
-            if local_conditioned and use_deconv:
-                self.upsample = L.Deconvolution2D(
-                    local_condition_dim, local_condition_dim,
-                    (upsample_factor, 1), (upsample_factor, 1))
+            if local_conditioned:
+                self.local_embed = NonCausalDilatedConvNet(
+                    [local_condition_dim] * 5)
+                if use_deconv:
+                    self.upsample = L.Deconvolution2D(
+                        local_condition_dim, local_condition_dim,
+                        (upsample_factor, 1), (upsample_factor, 1))
 
             if global_conditioned:
                 self.embed = L.EmbedID(n_speaker, embed_dim)
@@ -404,6 +422,7 @@ class WaveNet(chainer.Chain):
         else:
             local_cond = F.resize_images(
                 local_cond, (local_cond.shape[2] * self.upsample_factor, 1))
+        local_cond = self.local_embed(local_cond)
         return local_cond
 
     def embed_global_cond(self, global_cond):
