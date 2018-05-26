@@ -1,24 +1,24 @@
 # parameters of training
-batchsize = 16
+batchsize = 4
 lr = 2e-4
 ema_mu = 0.9999  # not supported now
-update_encoder = True
 trigger = (500000, 'iteration')
 evaluate_interval = (1, 'epoch')
 snapshot_interval = (1000, 'iteration')
 report_interval = (100, 'iteration')
 
 # parameters of dataset
-root = '../VCTK-Corpus'
-dataset = 'VCTK'
-# root = 'CMU_ARCTIC'
-# dataset = 'ARCTIC'
-# root = 'voice_statistics'
-# dataset = 'vs'
+root = '/data/datasets/VCTK-Corpus'
+dataset_type = 'VCTK'
+split_seed = 71
+
+# parameters of preprocessing
 sr = 16000
-quantize = 256
 top_db = 20
+input_dim = 256
+quantize = 256
 length = 7680
+use_logistic = False
 
 # parameters of VQ
 d = 512
@@ -28,18 +28,21 @@ k = 128
 n_loop = 3
 n_layer = 10
 filter_size = 2
-residual_channels = 32
-dilated_channels = 32
-skip_channels = 128
-use_logistic = False
-n_mixture = 30
+input_dim = input_dim
+residual_channels = 512
+dilated_channels = 512
+skip_channels = 256
+# quantize = quantize
+# use_logistic = use_logistic
+n_mixture = 10 * 3
 log_scale_min = -40
-embed_channels = 128
-use_deconv = False
-dropout_zero_rate = 0.
+global_condition_dim = 128
+local_condition_dim = 128
+dropout_zero_rate = 0
 
 # parameters of losses
 beta = 0.25
 
 # parameters of generating
 use_ema = True
+apply_dropout = False
