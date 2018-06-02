@@ -41,8 +41,9 @@ elif params.dataset_type == 'vs':
 # preprocess
 n = 1  # batchsize; now suporrts only 1
 preprocess = Preprocess(
-    params.sr, params.top_db, params.input_dim, params.quantize, None,
-    params.use_logistic, params.root, params.dataset_type)
+    params.sr, params.res_type, params.top_db, params.input_dim,
+    params.quantize, None, params.use_logistic, params.root,
+    params.dataset_type)
 inputs = preprocess(path)
 
 x_enc, _, global_condition, _ = inputs

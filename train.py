@@ -53,8 +53,9 @@ elif params.dataset_type == 'vs':
         speaker for speaker in pathlib.Path(params.root).glob('*/')])
 
 preprocess = Preprocess(
-    params.sr, params.top_db, params.input_dim, params.quantize, params.length,
-    params.use_logistic, params.root, params.dataset_type)
+    params.sr, params.res_type, params.top_db, params.input_dim,
+    params.quantize, params.length, params.use_logistic, params.root,
+    params.dataset_type)
 
 dataset = chainer.datasets.TransformDataset(files, preprocess)
 train, valid = chainer.datasets.split_dataset_random(

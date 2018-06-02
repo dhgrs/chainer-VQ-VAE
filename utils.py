@@ -30,9 +30,10 @@ class MuLaw(object):
 
 
 class Preprocess(object):
-    def __init__(self, sr, top_db, input_dim,
+    def __init__(self, sr, res_type, top_db, input_dim,
                  quantize, length, use_logistic, root, dataset_type):
         self.sr = sr
+        self.res_type = res_type
         self.top_db = top_db
         if input_dim == 1:
             self.mu_law_input = False
@@ -52,7 +53,7 @@ class Preprocess(object):
 
     def __call__(self, path):
         # load data(trim and normalize)
-        raw, _ = librosa.load(path, self.sr)
+        raw, _ = librosa.load(path, self.sr, res_type=self.res_type)
         raw, _ = librosa.effects.trim(raw, self.top_db)
         raw /= numpy.abs(raw).max()
         raw = raw.astype(numpy.float32)
