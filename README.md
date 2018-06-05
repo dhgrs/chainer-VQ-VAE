@@ -2,7 +2,7 @@
 A Chainer implementation of VQ-VAE( https://arxiv.org/abs/1711.00937 ).
 
 # Results
-Trained 165000 iterations on CMU ARCTIC. You can reproduce these results in Google Colaboratory.
+Trained about 63 hours with one 1080Ti (150000 iterations) on VCTK-Corpus. You can download pretrained model from [here](https://drive.google.com/open?id=1Ayy9NbpBoZCj1WVmwHGnUTG_jB2eonVU).
 
 Losses:
 
@@ -12,13 +12,7 @@ Losses:
 
 Audios:
 
-[Input](http://nana-music.com/sounds/037eb33f/)
-
-[Target speaker](http://nana-music.com/sounds/0383457c/)
-
-[Reconstruct(decode with input speaker)](http://nana-music.com/sounds/037eb451/)
-
-[Voice Conversion(decoce with target speaker)](http://nana-music.com/sounds/037eb39a/)
+[demo](https://nana-music.com/playlists/2276008/)
 
 # Requirements
 I trained and generated with
@@ -27,7 +21,7 @@ I trained and generated with
 - chainer(4.0.0b3)
 - librosa(0.5.1)
 
-And now you can try it on Google Colaboratory. You don't need install chainer/librosa or buy GPUs. Check [this](Colaboratory/README.md).
+And now you can try it on Google Colaboratory. You don't need install chainer/librosa in your local or buy GPUs. Check [this](Colaboratory/README.md).
 # Usage
 ## download dataset
 You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyamagis/page3/page58/page58.html). And you can download CMU-ARCTIC(en)/voice-statistics-corpus(ja) very easily via [my repository](https://github.com/dhgrs/download_dataset).
@@ -40,8 +34,6 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - Learning rate.
 - ema_mu
     - Rate of exponential moving average. If this is greater than 1 doesn't apply.
-- update_encoder
-    - Update encoder or not. If you use small dataset like CMU-ARCTIC(en)/voice-statistics-corpus(ja), the encoder of VQ-VAE may cause over-fitting. So after about 150-200k iterations, set this parameter False and restart training.
 - trigger
     - How many times you update the model. You can set this parameter like as (`<int>`, 'iteration') or (`<int>`, 'epoch')
 - evaluate_interval
@@ -56,14 +48,24 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - The root directory of training dataset.
 - dataset
     - The architecture of the directory of training dataset. Now this parameter supports `VCTK`, `ARCTIC` and 'vs'.
+- split_seed
+    - A seed for splitting dataset into train and validation.
+
+### parameters of preprocessing
 - sr
     - Sampling rate. If it's different from input file, be resampled by librosa.
-- quantize
-    - If `use_logistic` is `True` it should be 2 ** 16. If `False` it should be 256.
+- res_type
+    - The resampling algorithm used in librosa.
 - top_db
     - The threshold db for triming silence.
+- input_dim
+    - The input channels of wave. If it is `1`, mu-law is not applied. Else mu-law is applied.
+- quantize
+    - The number for quantize.
 - length
     - How many samples used for training.
+- use_logistic
+    - Use mixture of logistics or not.
 
 ### parameters of VQ
 - d
@@ -76,7 +78,7 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - If you want to make network like dilations [1, 2, 4, 1, 2, 4] set `n_loop` as `2`.
 - n_layer
     - If you want to make network like dilations [1, 2, 4, 1, 2, 4] set `n_layer` as `3`.
-- n_filter
+- filter_size
     - The filter size of each dilated convolution.
 - residual_channels
     - The number of input/output channels of residual blocks.
@@ -84,16 +86,14 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
     - The number of output channels of causal dilated convolution layers. This is splited into tanh and sigmoid so the number of hidden units is half of this number.
 - skip_channels
     - The number of channels of skip connections and last projection layer.
-- use_logistic
-    - If `True` use mixture of logistics.
 - n_mixture
     - The number of logistic distribution. It is used only `use_logistic` is `True`.
 - log_scale_min
     - The number for stability. It is used only `use_logistic` is `True`.
-- embed_channels
+- global_condition_dim
     - The dimension of speaker embeded-vector.
-- use_deconv
-    - If `True` use deconvolution layer. Else repeat quantized vector.
+- local_condition_dim
+    - The dimension of local contioning vectors.
 - dropout_zero_rate
     - The rate of `0` in dropout. If `0` doesn't apply dropout.
 
@@ -104,6 +104,8 @@ You can download VCTK-Corpus(en) from [here](http://homepages.inf.ed.ac.uk/jyama
 ### parameters of losses
 - use_ema
     - If `True` use the value of exponential moving average.
+- apply_dropout
+    - If `True` apply dropout.
 
 
 ## training
