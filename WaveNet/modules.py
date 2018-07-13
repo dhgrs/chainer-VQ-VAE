@@ -30,6 +30,12 @@ class ResidualBlock(chainer.Chain):
     def __call__(self, x, condition):
         length = x.shape[2]
 
+        # Dropout
+        if self.dropout_zero_rate:
+            h = F.dropout(x, ratio=self.dropout_zero_rate)
+        else:
+            h = x
+
         # Dilated conv
         h = self.conv(x)
         h = h[:, :, :length]
@@ -38,8 +44,6 @@ class ResidualBlock(chainer.Chain):
         h += self.condition_proj(condition)
 
         # Gated activation units
-        if self.dropout_zero_rate:
-            h = F.dropout(h, ratio=self.dropout_zero_rate)
         tanh_z, sig_z = F.split_axis(h, 2, axis=1)
         z = F.tanh(tanh_z) * F.sigmoid(sig_z)
 
