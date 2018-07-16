@@ -120,27 +120,20 @@ for i in range(len(output) - 1):
         means = out[:, nr_mix:2 * nr_mix]
         log_scales = out[:, 2 * nr_mix:3 * nr_mix]
         log_scales = decoder.xp.maximum(log_scales, params.log_scale_min)
+        scales = decoder.xp.exp(log_scales)
 
-        # generate uniform
+        # generate logistic
         rand = decoder.xp.random.uniform(0, 1, logit_probs.shape)
+        rand = means + scales * \
+            (decoder.xp.log(rand) - decoder.xp.log(1 - rand))
 
         # apply softmax
-        prob = logit_probs - decoder.xp.log(-decoder.xp.log(rand))
-
-        # sample
-        argmax = prob.argmax(axis=1)
-        means = means[:, argmax]
-        log_scales = log_scales[:, argmax]
-
-        # generate uniform
-        rand = decoder.xp.random.uniform(0, 1, log_scales.shape)
-
-        # convert into logistic
-        rand = means + decoder.xp.exp(log_scales) * \
-            (decoder.xp.log(rand) - decoder.xp.log(1 - rand))
+        rand *= chainer.functions.softmax(logit_probs).array
+        rand = rand.sum(axis=1)
 
         value = decoder.xp.squeeze(rand.astype(decoder.xp.float32))
         value /= 127.5
+        value = decoder.xp.clip(value, -1, 1)
         x_dec.array[:] = value
     else:
         value = decoder.xp.random.choice(
