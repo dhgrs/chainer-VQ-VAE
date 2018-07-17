@@ -37,7 +37,7 @@ class ResidualBlock(chainer.Chain):
             h = x
 
         # Dilated conv
-        h = self.conv(x)
+        h = self.conv(h)
         h = h[:, :, :length]
 
         # condition
