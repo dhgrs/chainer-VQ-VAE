@@ -138,6 +138,5 @@ If you don't set `-o`, default file name `result.wav` is used. If you don't set 
 # TODO
 - [x] upload generated sample
 - [x] using GPU fot generating
-    - Now only CPU is used for generating.
 - [x] descritized mixture of logistics
 - [ ] Parallel WaveNet
